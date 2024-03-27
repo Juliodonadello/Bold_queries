@@ -1,23 +1,39 @@
-WITH CHARGES_TOT AS (
+WITH CHARGE_CONTROL AS (
+  	SELECT 
+  			"public"."properties"."id" AS "PROP_ID",
+  			"public"."property_charge_controls"."item_id" as "ITEM_ID",
+  			CASE WHEN "public"."property_charge_controls"."base_rent" then 1 else 0 end as "BASE_RENT"
+  		
+  	FROM "public"."properties"
+  	INNER JOIN "public"."property_charge_controls"
+  		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
+  	
+  	WHERE "public"."properties"."name" IN (@Property_Name)
+),
+CHARGES_TOT AS (
   SELECT 
 		"recurring_charge_id" AS "RCHARGE_ID",
   		"public"."lease_recurring_charges"."lease_id" AS "LEASE_ID",
-  		CASE WHEN "public"."lease_recurring_charges"."order_entry_item_id" LIKE '%RENT%' OR  "public"."lease_recurring_charges"."order_entry_item_id" LIKE '%Rent%' THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "RENT_CHARGE",
-		CASE WHEN "public"."lease_recurring_charges"."order_entry_item_id"  NOT LIKE '%RENT%' AND "public"."lease_recurring_charges"."order_entry_item_id"  NOT LIKE '%Rent%'  THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "OTHER_CHARGE",
-		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE"
+  		--old --CASE WHEN "public"."lease_recurring_charges"."order_entry_item_id" LIKE '%RENT%' OR  "public"."lease_recurring_charges"."order_entry_item_id" LIKE '%Rent%' THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "RENT_CHARGE",
+		--old --CASE WHEN "public"."lease_recurring_charges"."order_entry_item_id"  NOT LIKE '%RENT%' AND "public"."lease_recurring_charges"."order_entry_item_id"  NOT LIKE '%Rent%'  THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "OTHER_CHARGE",
+		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "RENT_CHARGE",
+  		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 0 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "OTHER_CHARGE",
+  		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
+  		"public"."units"."property_id" "PROP_ID"
   
 	FROM "public"."lease_recurring_charges"
 	LEFT OUTER JOIN "public"."lease_recurring_charge_amounts"
 		ON "public"."lease_recurring_charges"."id" = "public"."lease_recurring_charge_amounts"."recurring_charge_id"
-	
+	INNER JOIN "public"."leases_units_units"  --aumenta los registros pero esta bien que se duplique un lease con distintas units
+  		ON "public"."lease_recurring_charges"."lease_id" ="public"."leases_units_units"."leasesId"
+ 	 INNER JOIN "public"."units"
+  		ON "public"."leases_units_units"."unitsId" =  "public"."units"."id"
+  	INNER JOIN CHARGE_CONTROL
+  		ON CHARGE_CONTROL. "PROP_ID" = "public"."units"."property_id"
+  		AND CHARGE_CONTROL. "ITEM_ID" = "public"."lease_recurring_charges"."order_entry_item_id"
+  
   	WHERE "public"."lease_recurring_charge_amounts"."effective_date" <= @AsOfDate
- ),
-MAX_CHARGES AS (
- 	SELECT  "RCHARGE_ID" "RCHARGE_ID",
-   	MAX("EFFECTIVE_DATE") "EFFECTIVE_DATE"
- 	FROM CHARGES_TOT
-	GROUP BY "RCHARGE_ID"
- ),
+),
 CHARGES AS ( 
  SELECT CHARGES_TOT.*
  FROM CHARGES_TOT
