@@ -34,6 +34,12 @@ CHARGES_TOT AS (
   
   	WHERE "public"."lease_recurring_charge_amounts"."effective_date" <= @AsOfDate
 	),
+MAX_CHARGES AS (
+ 	SELECT  "RCHARGE_ID" "RCHARGE_ID",
+   	MAX("EFFECTIVE_DATE") "EFFECTIVE_DATE"
+ 	FROM CHARGES_TOT
+	GROUP BY "RCHARGE_ID"
+ ),
 CHARGES AS ( 
  SELECT CHARGES_TOT.*
  FROM CHARGES_TOT
