@@ -176,40 +176,37 @@ FINAL AS (
 	"RENT_CHARGE",
 		"OTHER_CHARGE"
 	ORDER BY LEASES_CHARGES."LEASE_ID"
-	)
-
+	),
+FINAL_AUX AS (
+    -- prop SQ FT fix when having 2 or more leases for the same unit
+    -- we dont want to sum twice the unit sq ft
+    SELECT COUNT(DISTINCT "LEASE_ID") "LEASES_COUNT",
+    "UNIT_ID"
+    FROM FINAL
+)
 SELECT 
-UNITS."PROP_ID",
-UNITS."PROP_NAME",
-UNITS."UNIT_ID",
-UNITS."UNIT_NAME" "UNIT_NAME" ,
---CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS",
-CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS", -- esto se hizo porque los status future se deben ver como Occupied si el asofdate coincide
-FINAL."TENANT",
-FINAL."lease_created_at" "lease_created_at",
-FINAL."start" "lease_start",
-FINAL."lease_end",	
-UNITS."UNIT_SQ_FT" "UNIT_SQ_FT",
-CASE WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 END AS "Pct of Property",
-FINAL."DEPOSIT",
-FINAL."REFUNDABLE",
---LEASES."RCHARGE_ID",
-FINAL."RENT_CHARGE" "RENT_AMOUNT",
-FINAL."OTHER_CHARGE" "OTHER_AMOUNT",
-CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."RENT_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Rent/Sq Ft",
-CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."OTHER_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Other/Sq Ft"
-,"public"."company_accounts"."company_id" "COMPANY_ID"
-
+	UNITS."PROP_ID",
+	UNITS."PROP_NAME",
+	COUNT(DISTINCT UNITS."UNIT_ID") AS "UNIT_TOT",
+	SUM(UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") AS  "PROP_SQ_FT",
+	SUM(CASE WHEN (FINAL."LEASE_STATUS"='OCCUPIED') THEN CAST(UNITS."UNIT_SQ_FT" AS INTEGER) ELSE 0 END) AS "OCCUPIED_UNIT_SQ_FT",
+	SUM(FINAL."RENT_CHARGE") "RENT_AMOUNT_TOT",
+	SUM(FINAL."OTHER_CHARGE") "OTHER_AMOUNT_TOT",
+	"public"."company_accounts"."company_id" "COMPANY_ID"
+	
 FROM UNITS
 LEFT JOIN SQ_FT_TEMP
 	ON UNITS."PROP_ID" = SQ_FT_TEMP."PROP_ID"
 LEFT JOIN FINAL
 	ON UNITS."UNIT_ID" = FINAL."UNIT_ID"
+LEFT JOIN FINAL_AUX
+	ON FINAL."UNIT_ID" = FINAL_AUX."UNIT_ID"
 INNER JOIN "public"."properties"
 		ON UNITS."PROP_ID" = "public"."properties"."id"
 INNER JOIN "public"."company_accounts"
 		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
-		
-where  "PROP_NAME" IN (@Property_Name)
 
+where  "PROP_NAME" IN (@Property_Name)
+ and "public"."properties"."deleted_at" IS NULL
+group by UNITS."PROP_ID",UNITS."PROP_NAME","COMPANY_ID"
 order by "PROP_NAME"
