@@ -176,6 +176,14 @@ FINAL AS (
 	"RENT_CHARGE",
 		"OTHER_CHARGE"
 	ORDER BY LEASES_CHARGES."LEASE_ID"
+	),
+FINAL_AUX AS (
+    -- prop SQ FT fix when having 2 or more leases for the same unit
+    -- we dont want to sum twice the unit sq ft
+    SELECT COUNT(DISTINCT "LEASE_ID") "LEASES_COUNT",
+    "UNIT_ID"
+    FROM FINAL
+    GROUP BY "UNIT_ID"
 	)
 
 SELECT 
@@ -190,7 +198,9 @@ FINAL."lease_created_at" "lease_created_at",
 FINAL."start" "lease_start",
 FINAL."lease_end",	
 UNITS."UNIT_SQ_FT" "UNIT_SQ_FT",
+UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" "UNIT_SQ_FT_fix",
 CASE WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 END AS "Pct of Property",
+CASE WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 ELSE ("UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") / SQ_FT_TEMP."TOT_SQ_FT" * 100 END AS "Pct of Property_fix",
 FINAL."DEPOSIT",
 FINAL."REFUNDABLE",
 --LEASES."RCHARGE_ID",
@@ -205,6 +215,8 @@ LEFT JOIN SQ_FT_TEMP
 	ON UNITS."PROP_ID" = SQ_FT_TEMP."PROP_ID"
 LEFT JOIN FINAL
 	ON UNITS."UNIT_ID" = FINAL."UNIT_ID"
+LEFT JOIN FINAL_AUX
+	ON FINAL."UNIT_ID" = FINAL_AUX."UNIT_ID"
 INNER JOIN "public"."properties"
 		ON UNITS."PROP_ID" = "public"."properties"."id"
 INNER JOIN "public"."company_accounts"
