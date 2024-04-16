@@ -30,9 +30,9 @@ INNER JOIN "public"."properties" ON "public"."leases"."property_id"="public"."pr
 INNER JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
 
 WHERE
-"public"."leases"."status" = 'current'    
---AND "public"."tenants"."deleted_at" IS NULL  -- no agrego este filtro porque no manejamos AsOfDate
-AND 
 "public"."company_accounts"."company_id" = @COMPANY_ID
 AND 
 "public"."properties"."name" IN (@Property_Name)
+-- AND "public"."leases"."status" = 'current'    
+-- AND "public"."tenants"."deleted_at" IS NULL  -- no agrego este filtro porque no manejamos AsOfDate
+--AND "public"."leases"."status" IN (@Lease_Status) --Reatrieving operator error. Fix: Implementing a filter over the table layout using the parameter values
