@@ -248,6 +248,7 @@ INNER JOIN "public"."company_accounts"
 where  	UNITS."PROP_NAME" IN (@Property_Name)
 		AND UNITS."SQ_FT_TYPE" IN (@Sqft_Type)
 		AND UNITS."UNIT_CLASS" IN (@Unit_Class)
+		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 
 GROUP BY 
 	UNITS."PROP_ID",

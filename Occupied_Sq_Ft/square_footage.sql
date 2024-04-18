@@ -156,13 +156,16 @@ UNITS AS (
   		"public"."units"."name" AS "UNIT_NAME",
 		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT",
 		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
-		"public"."units"."unit_class" AS "UNIT_CLASS"
+		"public"."units"."unit_class" AS "UNIT_CLASS",
+  		"public"."company_accounts"."company_id" AS "COMPANY_ID"
   		
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
 	LEFT JOIN "public"."unit_square_footage_items"
 		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
+  	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 	
   	WHERE "public"."units"."deleted_at" IS NULL
   	and "public"."properties"."deleted_at" IS NULL
@@ -173,7 +176,8 @@ UNITS AS (
 		"public"."units"."id",
   		"public"."units"."name",
 		"public"."unit_square_footage_items"."square_footage_type",
-		"public"."units"."unit_class"
+		"public"."units"."unit_class",
+  		"public"."company_accounts"."company_id"
 	),
 FINAL AS (
 	select 
@@ -294,5 +298,6 @@ INNER JOIN "public"."company_accounts"
 where  	UNITS."PROP_NAME" IN (@Property_Name)
 		AND UNITS."SQ_FT_TYPE" IN (@Sqft_Type)
 		AND UNITS."UNIT_CLASS" IN (@Unit_Class)
+		AND UNITS."COMPANY_ID"  IN (@COMPANY_ID)
 
-order by "PROP_NAME"
+order by "PROP_NAME", UNITS."UNIT_NAME"

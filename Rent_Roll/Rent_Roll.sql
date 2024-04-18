@@ -239,4 +239,4 @@ INNER JOIN "public"."company_accounts"
 		
 where  "PROP_NAME" IN (@Property_Name)
 
-order by "PROP_NAME"
+order by "PROP_NAME", UNITS."UNIT_NAME"
