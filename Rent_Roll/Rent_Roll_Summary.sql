@@ -7,8 +7,11 @@ WITH CHARGE_CONTROL AS (
   	FROM "public"."properties"
   	INNER JOIN "public"."property_charge_controls"
   		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
+  	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   	
   	WHERE "public"."properties"."name" IN (@Property_Name)
+	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 	),
 CHARGES_TOT AS (
   SELECT 
@@ -137,9 +140,12 @@ SQ_FT_TEMP AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
+  	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   
   WHERE "public"."units"."deleted_at" IS NULL
   	and "public"."properties"."deleted_at" IS NULL
+	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 		
 	GROUP BY  "public"."properties"."id" 
 	),
@@ -154,10 +160,13 @@ UNITS AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-	
-  	WHERE "public"."units"."deleted_at" IS NULL
-  	and "public"."properties"."deleted_at" IS NULL
+	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   
+  	WHERE "public"."units"."deleted_at" IS NULL
+  		AND "public"."properties"."deleted_at" IS NULL
+		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+	
 	GROUP BY 
 		"public"."properties"."id",
 		"public"."properties"."name",
@@ -201,6 +210,7 @@ FINAL_AUX AS (
     GROUP BY "UNIT_ID"
 	)
 
+
 SELECT 
 	UNITS."PROP_ID",
 	UNITS."PROP_NAME",
@@ -229,5 +239,7 @@ INNER JOIN "public"."company_accounts"
 
 where  "PROP_NAME" IN (@Property_Name)
  and "public"."properties"."deleted_at" IS NULL
+ AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+
 group by UNITS."PROP_ID",UNITS."PROP_NAME","COMPANY_ID"
 order by "PROP_NAME"

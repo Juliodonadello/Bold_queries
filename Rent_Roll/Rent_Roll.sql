@@ -7,8 +7,11 @@ WITH CHARGE_CONTROL AS (
   	FROM "public"."properties"
   	INNER JOIN "public"."property_charge_controls"
   		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
+	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   	
   	WHERE "public"."properties"."name" IN (@Property_Name)
+	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 	),
 CHARGES_TOT AS (
   SELECT 
@@ -87,7 +90,7 @@ LEASES AS (
 		ON "public"."leases"."id" ="public"."leases_units_units"."leasesId"
 	LEFT OUTER JOIN "public"."lease_deposits"
 		ON "public"."leases"."id" = "public"."lease_deposits"."lease_id"
-		AND "public"."lease_deposits"."deleted_at" >= @AsOfDate
+		AND ("public"."lease_deposits"."deleted_at" >= @AsOfDate OR "public"."lease_deposits"."deleted_at" IS  NULL)
 	LEFT OUTER JOIN "public"."tenants"
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
@@ -139,9 +142,12 @@ SQ_FT_TEMP AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
+	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   
-  WHERE "public"."units"."deleted_at" IS NULL
-  	and "public"."properties"."deleted_at" IS NULL
+  	WHERE "public"."units"."deleted_at" IS NULL
+  		AND "public"."properties"."deleted_at" IS NULL
+		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 		
 	GROUP BY  "public"."properties"."id" 
 	),
@@ -156,10 +162,13 @@ UNITS AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
+	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 	
-  	WHERE "public"."units"."deleted_at" IS NULL
-  	and "public"."properties"."deleted_at" IS NULL
-  
+  	WHERE "public"."properties"."deleted_at" IS NULL
+		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+	
 	GROUP BY 
 		"public"."properties"."id",
 		"public"."properties"."name",
@@ -240,5 +249,6 @@ INNER JOIN "public"."company_accounts"
 		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 		
 where  "PROP_NAME" IN (@Property_Name)
+	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 
 order by "PROP_NAME", UNITS."UNIT_NAME"
