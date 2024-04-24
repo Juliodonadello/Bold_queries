@@ -52,6 +52,11 @@ CHARGES_TOT AS (
 		  	AND CAST(EXTRACT(DAY FROM (@AsOfDate - "public"."lease_recurring_charge_amounts"."effective_date")) AS INTEGER) < 31
 		)--one time charge with less than a month differnce
 		)
+	AND (	
+	  	"public"."lease_recurring_charges"."terminate_date" >= @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."terminate_date" is NULL 
+		)
 	),
 MAX_CHARGES AS (
  	SELECT  "RCHARGE_ID" "RCHARGE_ID",
