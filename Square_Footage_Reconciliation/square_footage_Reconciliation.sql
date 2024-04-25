@@ -18,6 +18,7 @@ WITH SQ_FT_TEMP AS (
   		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 		AND "public"."properties"."name" IN (@Property_Name)
 		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND "public"."unit_square_footage_items"."square_footage_type" IN (@Sqft_Type)
 		
 	GROUP BY  "public"."properties"."id", "public"."company_accounts"."company_id",
   		"public"."unit_square_footage_items"."square_footage_type",
@@ -33,6 +34,7 @@ aux AS (
 	INNER JOIN "public"."company_accounts"
 		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   WHERE "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND "public"."properties"."name" IN (@Property_Name)
 ),
 json1 AS (
   SELECT
@@ -117,7 +119,6 @@ FROM UNITS
 		ON PROP_SQ_FT."COMPANY_ID" = UNITS."COMPANY_ID" 
 			AND PROP_SQ_FT."PROP_ID" = UNITS."PROP_ID"
 */
-WHERE UNITS."UNIT_CLASS" IN (@Unit_Class)
-	AND UNITS."SQ_FT_TYPE" IN (@Sqft_Type)
+WHERE UNITS."SQ_FT_TYPE" IN (@Sqft_Type) --UNITS."UNIT_CLASS" IN (@Unit_Class)
 	
 GROUP BY 1,2,3,4,5,6,7,8,9,10
