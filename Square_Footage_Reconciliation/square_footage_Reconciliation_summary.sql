@@ -23,6 +23,7 @@ WITH SQ_FT_TEMP AS (
 		AND "public"."properties"."name" IN (@Property_Name)
 		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 		AND "public"."unit_square_footage_items"."square_footage_type" IN (@Sqft_Type)
+  		AND "public"."property_square_footage_items"."square_footage_type" IN (@Sqft_Type)
   		AND "public"."property_square_footage_items"."as_of_date" <= @AsOfDate
 		
 	GROUP BY  1,3,4,5,6
@@ -71,8 +72,12 @@ SELECT 	UNITS."PROP_ID",
 		UNITS."COMPANY_ID",
 		COUNT(DISTINCT UNITS."UNIT_ID")  "COUNT_UNITS",
 		SUM(UNITS."UNIT_SQ_FT") "sum_units_TOT_SQ_FT",  		
-		MAX(SQ_FT_TEMP."TOT_SQ_FT") "TOT_SQ_FT",
-		MAX(SQ_FT_TEMP."PROP_SQ_FT") "PROP_SQ_FT"
+		SQ_FT_TEMP."TOT_SQ_FT" "TOT_SQ_FT",
+		SQ_FT_TEMP."PROP_SQ_FT" "PROP_SQ_FT",
+		CASE   WHEN (SQ_FT_TEMP."TOT_SQ_FT" > SQ_FT_TEMP."PROP_SQ_FT") THEN 1 
+							WHEN (SQ_FT_TEMP."TOT_SQ_FT" < SQ_FT_TEMP."PROP_SQ_FT") THEN 1 
+							ELSE 0 
+				END AS "COUNT_PROP_DIFF_SQ_FT"
 
 FROM UNITS
 INNER JOIN SQ_FT_TEMP
@@ -83,4 +88,4 @@ INNER JOIN SQ_FT_TEMP
 			
 WHERE UNITS."SQ_FT_TYPE" IN (@Sqft_Type)
 	
-GROUP BY 1,2,3,4
+GROUP BY 1,2,3,4,7,8,9
