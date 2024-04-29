@@ -17,8 +17,10 @@ WITH UNITS AS
   	INNER JOIN "public"."company_accounts"
 		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 	
-  	WHERE "public"."units"."deleted_at" IS NULL
-  	and "public"."properties"."deleted_at" IS NULL
+	WHERE "public"."properties"."deleted_at" IS NULL
+		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+	
   
 	GROUP BY 
 		"public"."properties"."id",

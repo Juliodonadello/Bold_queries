@@ -7,8 +7,11 @@ WITH CHARGE_CONTROL AS (
   	FROM "public"."properties"
   	INNER JOIN "public"."property_charge_controls"
   		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
+	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   	
   	WHERE "public"."properties"."name" IN (@Property_Name)
+	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 	),
 CHARGES_TOT AS (
   SELECT 
@@ -49,6 +52,11 @@ CHARGES_TOT AS (
 		  	AND CAST(EXTRACT(DAY FROM (@AsOfDate - "public"."lease_recurring_charge_amounts"."effective_date")) AS INTEGER) < 31
 		)--one time charge with less than a month differnce
 		)
+	AND (	
+	  	"public"."lease_recurring_charges"."terminate_date" >= @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."terminate_date" is NULL 
+		)
 	),
 MAX_CHARGES AS (
  	SELECT  "RCHARGE_ID" "RCHARGE_ID",
@@ -86,7 +94,8 @@ LEASES AS (
 	INNER JOIN "public"."leases_units_units"
 		ON "public"."leases"."id" ="public"."leases_units_units"."leasesId"
 	LEFT OUTER JOIN "public"."lease_deposits"
-		ON "public"."leases"."id" = "public"."lease_deposits"."lease_id" 
+		ON "public"."leases"."id" = "public"."lease_deposits"."lease_id"
+		AND ("public"."lease_deposits"."deleted_at" >= @AsOfDate OR "public"."lease_deposits"."deleted_at" IS  NULL)
 	LEFT OUTER JOIN "public"."tenants"
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
@@ -95,6 +104,7 @@ LEASES AS (
   			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
 		)
 		AND "public"."leases"."status" = 'current'
+		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
   	
   GROUP BY
   		"public"."leases"."id",
@@ -137,9 +147,12 @@ SQ_FT_TEMP AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
+	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   
-  WHERE "public"."units"."deleted_at" IS NULL
-  	and "public"."properties"."deleted_at" IS NULL
+  	WHERE "public"."units"."deleted_at" IS NULL
+  		AND "public"."properties"."deleted_at" IS NULL
+		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 		
 	GROUP BY  "public"."properties"."id" 
 	),
@@ -154,10 +167,13 @@ UNITS AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
+	INNER JOIN "public"."company_accounts"
+		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 	
-  	WHERE "public"."units"."deleted_at" IS NULL
-  	and "public"."properties"."deleted_at" IS NULL
-  
+  	WHERE "public"."properties"."deleted_at" IS NULL
+		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+	
 	GROUP BY 
 		"public"."properties"."id",
 		"public"."properties"."name",
@@ -238,8 +254,9 @@ INNER JOIN "public"."company_accounts"
 		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 		
 where  "PROP_NAME" IN (@Property_Name)
+	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 
-order by "PROP_NAME",
+order by UNITS."PROP_NAME",
 	CASE 
         WHEN UNITS."UNIT_NAME"  LIKE 'APT%' THEN 1  -- Apartments
 		WHEN UNITS."UNIT_NAME"  SIMILAR TO '[0-9][0-9][0-9]-%' THEN 2  -- Units with numbers followed by a hyphen

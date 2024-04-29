@@ -52,6 +52,11 @@ CHARGES_TOT AS (
 		  	AND CAST(EXTRACT(DAY FROM (@AsOfDate - "public"."lease_recurring_charge_amounts"."effective_date")) AS INTEGER) < 31
 		)--one time charge with less than a month differnce
 		)
+	AND (	
+	  	"public"."lease_recurring_charges"."terminate_date" >= @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."terminate_date" is NULL 
+		)
 	),
 MAX_CHARGES AS (
  	SELECT  "RCHARGE_ID" "RCHARGE_ID",
@@ -99,6 +104,7 @@ LEASES AS (
   			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
 		)
 		AND "public"."leases"."status" = 'current'
+		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
   	
   GROUP BY
   		"public"."leases"."id",
@@ -147,7 +153,8 @@ SQ_FT_TEMP AS (
 		ON "public"."units"."property_id" = "public"."properties"."id"
 	INNER JOIN "public"."company_accounts"
 		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
-  	WHERE "public"."units"."deleted_at" IS NULL
+  	
+	WHERE "public"."units"."deleted_at" IS NULL
   		AND "public"."properties"."deleted_at" IS NULL
 		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 		
@@ -172,9 +179,9 @@ UNITS AS (
   	INNER JOIN "public"."company_accounts"
 		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 	
-  	WHERE "public"."units"."deleted_at" IS NULL
-  	and "public"."properties"."deleted_at" IS NULL
-  	AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+  	WHERE "public"."properties"."deleted_at" IS NULL
+		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 	
 	GROUP BY 
 		"public"."properties"."id",
