@@ -5,6 +5,7 @@ SELECT "public"."lease_options"."id"             AS "Clause_id",
        --"public"."lease_options"."tenant_email",
        "public"."lease_options"."property_manager_email",
        "public"."lease_options"."description",
+       "public"."lease_options"."note",
        "public"."lease_options"."sent",
        "public"."lease_options"."leaseId",
        "public"."lease_options"."property_id",
@@ -35,6 +36,7 @@ WHERE "public"."company_accounts"."company_id" = @COMPANY_ID
        "public"."lease_options"."expiration_date",
        "public"."lease_options"."property_manager_email",
        "public"."lease_options"."description",
+       "public"."lease_options"."note",
        "public"."lease_options"."sent",
        "public"."lease_options"."leaseId",
        "public"."lease_options"."property_id",
@@ -44,4 +46,5 @@ WHERE "public"."company_accounts"."company_id" = @COMPANY_ID
 	   "public"."tenants"."name",
 	   "public"."leases"."status"
   
-ORDER BY "public"."lease_options"."lease_category"
+ORDER BY "public"."lease_options"."lease_category",
+    "public"."units"."name"

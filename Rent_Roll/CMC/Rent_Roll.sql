@@ -87,7 +87,7 @@ LEASES AS (
 		"public"."leases"."end" AS "lease_end",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END AS "LEASE_STATUS",
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END AS "DEPOSIT",
-		CASE WHEN  "public"."lease_deposits"."refundable" = 'true' THEN 'YES' ELSE 'NO' END AS "REFUNDABLE",
+		CASE WHEN "public"."lease_deposits"."refundable" = 'true' THEN 'YES' ELSE 'NO' END AS "REFUNDABLE",
 		"public"."tenants"."name"  as "TENANT"
   
   FROM "public"."leases"
@@ -122,8 +122,8 @@ LEASES_CHARGES AS (
   	LEASES."LEASE_ID",
 	LEASES."UNIT_ID",
 	MIN(LEASES."lease_created_at") "lease_created_at", --because of difference in seconds, can't be grouped
-  	MIN(LEASES."start") "start",
-	MAX(LEASES."lease_end") "lease_end", --because of difference in seconds, can't be grouped
+  	MIN(LEASES."start") "start",  
+	MAX(LEASES."lease_end") "lease_end", --because of difference in seconds, can't be grouped -- esta mal tomar max si justo se pisan dos leases
   	LEASES."TENANT",
   	COALESCE(MAX(CASE WHEN LEASES."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' END), MAX(LEASES."LEASE_STATUS")) AS "LEASE_STATUS",
   	COALESCE(MAX(CASE WHEN LEASES."DEPOSIT" = 'YES' THEN 'YES' END), MAX(LEASES."DEPOSIT")) AS "DEPOSIT",
