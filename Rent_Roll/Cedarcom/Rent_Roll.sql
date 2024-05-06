@@ -173,7 +173,11 @@ UNITS AS (
   	WHERE "public"."properties"."deleted_at" IS NULL
 		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-	
+		AND ("public"."units"."name" NOT LIKE '%INACTIVE%' 
+			OR "public"."units"."name" NOT LIKE '%inactive%'
+			OR "public"."units"."name" NOT LIKE '%Inactive%'
+			)
+  
 	GROUP BY 
 		"public"."properties"."id",
 		"public"."properties"."name",
