@@ -87,14 +87,19 @@ LEASES AS (
 		"public"."leases"."end" AS "lease_end",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END AS "LEASE_STATUS",
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END AS "DEPOSIT",
-		CASE WHEN  "public"."lease_deposits"."refundable" = 'true' THEN 'YES' ELSE 'NO' END AS "REFUNDABLE",
+		CASE
+			WHEN COUNT(DISTINCT "public"."lease_deposits"."refundable") > 1 THEN 'MANY'
+			WHEN MAX(CASE WHEN "public"."lease_deposits"."refundable" = 'true' THEN 1 ELSE 0 END) = 1 THEN 'YES'
+			ELSE 'NO'
+		END AS "REFUNDABLE",
 		"public"."tenants"."name"  as "TENANT"
   
   FROM "public"."leases"
 	INNER JOIN "public"."leases_units_units"
 		ON "public"."leases"."id" ="public"."leases_units_units"."leasesId"
 	LEFT OUTER JOIN "public"."lease_deposits"
-		ON "public"."leases"."id" = "public"."lease_deposits"."lease_id" 
+		ON "public"."leases"."id" = "public"."lease_deposits"."lease_id"
+		AND ("public"."lease_deposits"."deleted_at" >= @AsOfDate OR "public"."lease_deposits"."deleted_at" IS  NULL)
 	LEFT OUTER JOIN "public"."tenants"
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
@@ -103,6 +108,7 @@ LEASES AS (
   			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
 		)
 		AND "public"."leases"."status" = 'current'
+		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
   	
   GROUP BY
   		"public"."leases"."id",
@@ -112,7 +118,6 @@ LEASES AS (
 		"public"."leases"."end",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END ,
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END ,
-		CASE WHEN  "public"."lease_deposits"."refundable" = 'true' THEN 'YES' ELSE 'NO' END,
 		"public"."tenants"."name"
 	),
 LEASES_CHARGES AS (
