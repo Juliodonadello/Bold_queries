@@ -87,7 +87,11 @@ LEASES AS (
 		"public"."leases"."end" AS "lease_end",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END AS "LEASE_STATUS",
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END AS "DEPOSIT",
-		CASE WHEN  "public"."lease_deposits"."refundable" = 'true' THEN 'YES' ELSE 'NO' END AS "REFUNDABLE",
+		CASE
+			WHEN COUNT(DISTINCT "public"."lease_deposits"."refundable") > 1 THEN 'MANY'
+			WHEN MAX(CASE WHEN "public"."lease_deposits"."refundable" = 'true' THEN 1 ELSE 0 END) = 1 THEN 'YES'
+			ELSE 'NO'
+		END AS "REFUNDABLE",
 		"public"."tenants"."name"  as "TENANT"
   
   FROM "public"."leases"
@@ -114,7 +118,6 @@ LEASES AS (
 		"public"."leases"."end",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END ,
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END ,
-		CASE WHEN  "public"."lease_deposits"."refundable" = 'true' THEN 'YES' ELSE 'NO' END,
 		"public"."tenants"."name"
 	),
 LEASES_CHARGES AS (
@@ -222,6 +225,7 @@ UNITS."PROP_ID",
 UNITS."PROP_NAME",
 UNITS."UNIT_ID",
 UNITS."UNIT_NAME" "UNIT_NAME" ,
+FINAL."LEASE_ID",
 --CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS",
 CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS", -- esto se hizo porque los status future se deben ver como Occupied si el asofdate coincide
 FINAL."TENANT",
