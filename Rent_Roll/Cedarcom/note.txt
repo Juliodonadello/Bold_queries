@@ -1,1 +1,0 @@
-Cedarcom queries aren't beeing used. The custom report is a copy of the standard.

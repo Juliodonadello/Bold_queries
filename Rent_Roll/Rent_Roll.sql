@@ -44,6 +44,11 @@ CHARGES_TOT AS (
 		"public"."lease_recurring_charge_amounts"."deleted_at" IS NULL
 		)
 	AND (
+		"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."deleted_at" IS NULL
+		)
+	AND (
 		"public"."lease_recurring_charge_amounts"."frequency" != 'One Time' --not a one time charge
 		OR
 		(
