@@ -7,11 +7,9 @@ WITH CHARGE_CONTROL AS (
   	FROM "public"."properties"
   	INNER JOIN "public"."property_charge_controls"
   		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
-	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   	
   	WHERE "public"."properties"."name" IN (@Property_Name)
-	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND "public"."properties"."company_relation_id" = 366
 	),
 CHARGES_TOT AS (
   SELECT 
@@ -42,11 +40,6 @@ CHARGES_TOT AS (
 		"public"."lease_recurring_charge_amounts"."deleted_at" >= @AsOfDate 
 		OR 
 		"public"."lease_recurring_charge_amounts"."deleted_at" IS NULL
-		)
-	AND (
-		"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
-		OR
-		"public"."lease_recurring_charges"."deleted_at" IS NULL
 		)
 	AND (
 		"public"."lease_recurring_charge_amounts"."frequency" != 'One Time' --not a one time charge
@@ -97,6 +90,7 @@ LEASES AS (
 		"public"."leases"."created_at" AS "lease_created_at",
   		"public"."leases"."start" AS "start",
 		"public"."leases"."end" AS "lease_end",
+		"public"."leases"."status",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END AS "LEASE_STATUS",
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END AS "DEPOSIT",
 		CASE
@@ -116,11 +110,22 @@ LEASES AS (
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
 	WHERE 
-		(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
-  			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
+		CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
+		
+		AND
+		(
+			(
+				(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
+					OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
+				)
+				AND "public"."leases"."status" = 'current'
+				AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
+			)
+			OR
+			(	"public"."leases"."start" <= @AsOfDate
+				AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
+			)
 		)
-		AND "public"."leases"."status" = 'current'
-		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
   	
   GROUP BY
   		"public"."leases"."id",
@@ -128,6 +133,7 @@ LEASES AS (
 		"public"."leases"."created_at",
   		"public"."leases"."start",
 		"public"."leases"."end",
+		"public"."leases"."status",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END ,
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END ,
 		"public"."tenants"."name"
@@ -140,6 +146,7 @@ LEASES_CHARGES AS (
   	MIN(LEASES."start") "start",
 	MAX(LEASES."lease_end") "lease_end", --because of difference in seconds, can't be grouped
   	LEASES."TENANT",
+	LEASES."status",
   	COALESCE(MAX(CASE WHEN LEASES."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' END), MAX(LEASES."LEASE_STATUS")) AS "LEASE_STATUS",
   	COALESCE(MAX(CASE WHEN LEASES."DEPOSIT" = 'YES' THEN 'YES' END), MAX(LEASES."DEPOSIT")) AS "DEPOSIT",
   	COALESCE(MAX(CASE WHEN LEASES."REFUNDABLE" = 'YES' THEN 'YES' END), MAX(LEASES."REFUNDABLE")) AS "REFUNDABLE",
@@ -152,6 +159,7 @@ LEASES_CHARGES AS (
   		AND LEASES."UNIT_ID" = CHARGES."UNIT_ID"
 	GROUP BY LEASES."LEASE_ID",
 		LEASES."UNIT_ID",
+		LEASES."status",
 		LEASES."TENANT" 
 	),
 SQ_FT_TEMP AS (
@@ -162,12 +170,10 @@ SQ_FT_TEMP AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   
   	WHERE "public"."units"."deleted_at" IS NULL
   		AND "public"."properties"."deleted_at" IS NULL
-		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND "public"."properties"."company_relation_id" = 366
 		
 	GROUP BY  "public"."properties"."id" 
 	),
@@ -182,11 +188,9 @@ UNITS AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 	
   	WHERE "public"."properties"."deleted_at" IS NULL
-		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND "public"."properties"."company_relation_id" = 366
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 		AND ("public"."units"."name" NOT LIKE '%INACTIVE%' 
 			OR "public"."units"."name" NOT LIKE '%inactive%'
@@ -207,6 +211,7 @@ FINAL AS (
 		"start",
 		"lease_end",
 		"TENANT",
+		"status",
 		"LEASE_STATUS",
 		"DEPOSIT",
 		"REFUNDABLE",
@@ -220,6 +225,7 @@ FINAL AS (
 		"start",
 		"lease_end",
 		"TENANT",
+		"status",
 		"LEASE_STATUS",
 		"DEPOSIT",
 		"REFUNDABLE",
@@ -242,11 +248,13 @@ UNITS."PROP_NAME",
 UNITS."UNIT_ID",
 UNITS."UNIT_NAME" "UNIT_NAME" ,
 --CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS",
+FINAL."status" "LEASE_STATUS_RAW",
 CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS", -- esto se hizo porque los status future se deben ver como Occupied si el asofdate coincide
 FINAL."TENANT",
 FINAL."lease_created_at" "lease_created_at",
 FINAL."start" "lease_start",
 FINAL."lease_end",	
+
 UNITS."UNIT_SQ_FT" "UNIT_SQ_FT",
 UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" "UNIT_SQ_FT_fix",
 CASE WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 END AS "Pct of Property",
@@ -257,8 +265,8 @@ FINAL."REFUNDABLE",
 FINAL."RENT_CHARGE" "RENT_AMOUNT",
 FINAL."OTHER_CHARGE" "OTHER_AMOUNT",
 CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."RENT_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Rent/Sq Ft",
-CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."OTHER_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Other/Sq Ft"
-,"public"."company_accounts"."company_id" "COMPANY_ID"
+CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."OTHER_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Other/Sq Ft",
+'Cedarcom' "COMPANY_ID"
 
 FROM UNITS
 LEFT JOIN SQ_FT_TEMP
@@ -269,10 +277,8 @@ LEFT JOIN FINAL_AUX
 	ON FINAL."UNIT_ID" = FINAL_AUX."UNIT_ID"
 INNER JOIN "public"."properties"
 		ON UNITS."PROP_ID" = "public"."properties"."id"
-INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 		
 where  "PROP_NAME" IN (@Property_Name)
-	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND "public"."properties"."company_relation_id" = 366
 
 order by "PROP_NAME", UNITS."UNIT_NAME"
