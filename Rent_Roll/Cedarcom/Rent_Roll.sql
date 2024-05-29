@@ -9,7 +9,9 @@ WITH CHARGE_CONTROL AS (
   		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
   	
   	WHERE "public"."properties"."name" IN (@Property_Name)
-	AND "public"."properties"."company_relation_id" = 366
+	AND "public"."properties"."company_relation_id" = @REAL_COMPANY_ID
+  	AND CAST("public"."properties"."property_type" AS TEXT) IN (@Property_Type)
+  	AND CAST("public"."properties"."department" AS TEXT) IN (@Department)
 	),
 CHARGES_TOT AS (
   SELECT 
@@ -110,22 +112,9 @@ LEASES AS (
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
 	WHERE 
-		CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
-		
-		AND
-		(
-			(
-				(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
-					OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
-				)
-				AND "public"."leases"."status" = 'current'
-				AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
-			)
-			OR
-			(	"public"."leases"."start" <= @AsOfDate
-				AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
-			)
-		)
+		"public"."leases"."start" <= @AsOfDate
+		AND "public"."leases"."status" = 'current'
+		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
   	
   GROUP BY
   		"public"."leases"."id",
@@ -189,8 +178,12 @@ UNITS AS (
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
 	
-  	WHERE "public"."properties"."deleted_at" IS NULL
-		AND "public"."properties"."company_relation_id" = 366
+  	WHERE "public"."properties"."name" IN (@Property_Name)
+		AND "public"."properties"."company_relation_id" = @REAL_COMPANY_ID
+		AND CAST("public"."properties"."property_type" AS TEXT) IN (@Property_Type)
+		AND CAST("public"."properties"."department" AS TEXT) IN (@Department)
+		
+  		AND "public"."properties"."deleted_at" IS NULL
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 		AND ("public"."units"."name" NOT LIKE '%INACTIVE%' 
 			OR "public"."units"."name" NOT LIKE '%inactive%'

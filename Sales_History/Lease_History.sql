@@ -1,7 +1,9 @@
-SELECT "public"."sales_entry"."id",
-DATE_PART('year' , "public"."sales_entry"."transaction_date") AS "created_at_YEAR",
-DATE_PART('month' , "public"."sales_entry"."transaction_date") AS "created_at_MONTH",
-TO_CHAR("public"."sales_entry"."transaction_date", 'Month') AS "created_aaat_MONTH",
+WITH SALES AS (
+  SELECT
+"public"."sales_entry"."id",
+DATE_PART('year' , "public"."sales_entry"."transaction_date") AS "YEAR",
+DATE_PART('month' , "public"."sales_entry"."transaction_date") AS "MONTH",
+TO_CHAR("public"."sales_entry"."transaction_date", 'Month') AS "MONTH_NAME",
 "public"."sales_entry"."transaction_date",
 "public"."sales_entry"."transaction_type",
 "public"."sales_entry"."sales_type",
@@ -24,3 +26,23 @@ INNER JOIN "public"."properties"
     AND "public"."properties"."company_relation_id"="public"."units"."company_relation_id"
 	
 WHERE "public"."sales_entry"."company_relation_id"  = @REAL_COMPANY_ID
+  AND "public"."sales_entry"."transaction_date" >= CURRENT_DATE - INTERVAL '5 years'
+  AND "public"."sales_entry"."transaction_date" <= CURRENT_DATE
+)  
+
+SELECT 
+SALES."YEAR",
+SALES."MONTH",
+SALES."MONTH_NAME",
+SALES."transaction_type",
+SALES."sales_type",
+SALES."sales_category",
+SALES."unit_id",
+SALES."lease_id",
+SALES."tenant_id",
+SALES."company_relation_id",
+SUM(SALES."sales_volume") "MONTHLY_AMOUNT"
+
+FROM SALES
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10

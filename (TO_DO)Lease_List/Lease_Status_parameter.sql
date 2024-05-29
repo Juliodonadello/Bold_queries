@@ -17,5 +17,7 @@ WHERE
         AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
         AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
     )
+    
+    -- AGREGAR FILTRO POR UNIDADES Y PROPIEDADES
   	
 GROUP BY "public"."leases"."status"

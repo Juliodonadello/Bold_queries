@@ -31,8 +31,9 @@ INNER JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."prim
 
 WHERE
 "public"."company_accounts"."company_id" = @COMPANY_ID
-AND 
-"public"."properties"."name" IN (@Property_Name)
--- AND "public"."leases"."status" = 'current'    
--- AND "public"."tenants"."deleted_at" IS NULL  -- no agrego este filtro porque no manejamos AsOfDate
---AND "public"."leases"."status" IN (@Lease_Status) --Reatrieving operator error. Fix: Implementing a filter over the table layout using the parameter values
+-- AND "public"."leases"."status" = 'current' AND "public"."tenants"."deleted_at" IS NULL  -- no agrego este filtro porque no manejamos AsOfDate
+AND "public"."insurances"."expiration_date" >= @From_Date
+AND "public"."insurances"."expiration_date" <= @To_Date
+AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
+AND "public"."properties"."name" IN (@Property_Name)
+AND CAST("public"."insurances"."insurance_type" AS TEXT) IN (@Insurance_Type)
