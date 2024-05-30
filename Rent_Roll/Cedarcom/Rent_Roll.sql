@@ -185,10 +185,9 @@ UNITS AS (
 		
   		AND "public"."properties"."deleted_at" IS NULL
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-		AND ("public"."units"."name" NOT LIKE '%INACTIVE%' 
-			OR "public"."units"."name" NOT LIKE '%inactive%'
-			OR "public"."units"."name" NOT LIKE '%Inactive%'
-			)
+		AND "public"."units"."name" NOT LIKE '%INACTIVE%'
+		AND "public"."units"."name" NOT LIKE '%inactive%'
+		AND "public"."units"."name" NOT LIKE '%Inactive%'
   
 	GROUP BY 
 		"public"."properties"."id",
