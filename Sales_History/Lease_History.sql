@@ -24,10 +24,14 @@ INNER JOIN "public"."tenants" ON "public"."tenants"."id"="public"."sales_entry".
 INNER JOIN "public"."properties" 
     ON "public"."properties"."id"="public"."units"."property_id"
     AND "public"."properties"."company_relation_id"="public"."units"."company_relation_id"
+INNER JOIN "public"."leases" 
+    ON "public"."leases"."id"="public"."sales_entry"."lease_id"
 	
-WHERE "public"."sales_entry"."company_relation_id"  = @REAL_COMPANY_ID
-  AND "public"."sales_entry"."transaction_date" >= CURRENT_DATE - INTERVAL '5 years'
+WHERE --CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+  --AND 
+  "public"."sales_entry"."transaction_date" >= CURRENT_DATE - INTERVAL '5 years'
   AND "public"."sales_entry"."transaction_date" <= CURRENT_DATE
+  AND "public"."leases"."name" IN (@Lease_Name)
 )  
 
 SELECT 
