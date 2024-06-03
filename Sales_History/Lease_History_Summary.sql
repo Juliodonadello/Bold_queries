@@ -82,99 +82,10 @@ WHERE --CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_CO
   "public"."sales_entry"."transaction_date" >= CURRENT_DATE - INTERVAL '5 years'
   AND "public"."sales_entry"."transaction_date" <= CURRENT_DATE
   AND "public"."leases"."name" IN (@Lease_Name)
-),
-Lease_History AS ( 
-  SELECT 
-  SALES."YEAR",
-  SALES."MONTH",
-  SALES."MONTH_NAME",
-  SALES."transaction_type",
-  SALES."transaction_type_group",
-  SALES."sales_type",
-  SALES."sales_category",
-  SALES."unit_id",
-  SALES."UNIT_NAME",
-  SALES."lease_id",
-  SALES."LEASE_NAME",
-  SALES."tenant_id",
-  SALES."TENANT_NAME",
-  SALES."company_relation_id",
-  SALES."PROP_NAME",
-  RENT_CHARGES."frequency",
-  RENT_CHARGES."ITEM_ID",
-  SUM(SALES."sales_volume") "MONTHLY_AMOUNT",
-  MAX(RENT_CHARGES."RENT_CHARGE") AS "RENT_CHARGE"
-
-  FROM SALES
-  LEFT JOIN RENT_CHARGES
-	  ON RENT_CHARGES."YEAR" = SALES."YEAR"
-	  AND RENT_CHARGES."MONTH" = SALES."MONTH"
-	  AND RENT_CHARGES."MONTH_NAME" = SALES."MONTH_NAME"
-	  AND RENT_CHARGES."LEASE_ID" = SALES."lease_id"
-	  AND RENT_CHARGES."PROP_ID" = SALES."PROP_ID"
-
-  GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17
-  ORDER BY  SALES."YEAR" DESC
-),
-Annual_Lease_History AS (
-  SELECT 
-	Lease_History."YEAR",
-	Lease_History."transaction_type_group",
-	Lease_History."lease_id",
-	Lease_History."LEASE_NAME",
-	Lease_History."PROP_NAME",
-	Lease_History."company_relation_id",
-	SUM(Lease_History."MONTHLY_AMOUNT") "ANNUAL_AMOUNT",
-	SUM(Lease_History."RENT_CHARGE") "RENT_CHARGE"
-  FROM Lease_History
-  GROUP BY 1,2,3,4,5,6
-),
-Lease_History_With_Variation AS (
-  SELECT 
-	ALH.*,
-	LAG(ALH."ANNUAL_AMOUNT") OVER (PARTITION BY ALH."lease_id", ALH."transaction_type_group"  ORDER BY ALH."YEAR") AS "PREV_ANNUAL_AMOUNT",
-	(ALH."ANNUAL_AMOUNT" - LAG(ALH."ANNUAL_AMOUNT") OVER (PARTITION BY ALH."lease_id", ALH."transaction_type_group"  ORDER BY ALH."YEAR")) / LAG(ALH."ANNUAL_AMOUNT") OVER (PARTITION BY ALH."lease_id" ORDER BY ALH."YEAR") * 100 AS "PERCENTAGE_VARIATION"
-  FROM Annual_Lease_History ALH
 )
-SELECT 
-SALES."YEAR",
-SALES."MONTH",
-SALES."MONTH_NAME",
-SALES."transaction_type",
-SALES."transaction_type_group",
-SALES."sales_type",
-SALES."sales_category",
-SALES."unit_id",
-SALES."UNIT_NAME",
-SALES."lease_id",
-SALES."LEASE_NAME",
-SALES."tenant_id",
-SALES."TENANT_NAME",
-SALES."company_relation_id",
-SALES."PROP_NAME",
-RENT_CHARGES."frequency",
-RENT_CHARGES."ITEM_ID",
-Lease_History_With_Variation."PREV_ANNUAL_AMOUNT",
-Lease_History_With_Variation."PERCENTAGE_VARIATION",
-SUM(SALES."sales_volume") "MONTHLY_AMOUNT",
-MAX(RENT_CHARGES."RENT_CHARGE") AS "RENT_CHARGE"
+select SALES."transaction_type",
+SALES."transaction_type_group"
 
-FROM SALES
-LEFT JOIN RENT_CHARGES
-	ON RENT_CHARGES."YEAR" = SALES."YEAR"
-	AND RENT_CHARGES."MONTH" = SALES."MONTH"
-	AND RENT_CHARGES."MONTH_NAME" = SALES."MONTH_NAME"
-	AND RENT_CHARGES."LEASE_ID" = SALES."lease_id"
-	AND RENT_CHARGES."PROP_ID" = SALES."PROP_ID"
-LEFT JOIN Lease_History_With_Variation
-	ON Lease_History_With_Variation."YEAR" = SALES."YEAR"
-	AND Lease_History_With_Variation."transaction_type_group" = SALES."transaction_type_group"
-	AND Lease_History_With_Variation."lease_id" = SALES."lease_id"
-	AND Lease_History_With_Variation."LEASE_NAME" = SALES."LEASE_NAME"
-	AND Lease_History_With_Variation."PROP_NAME" = SALES."PROP_NAME"
-	AND Lease_History_With_Variation."company_relation_id" = SALES."company_relation_id"
+from SALES
 
-WHERE CAST(SALES."transaction_type_group" AS TEXT) IN (@Transaction_Type)
-
-GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
-ORDER BY  SALES."YEAR" DESC
+group by 1,2
