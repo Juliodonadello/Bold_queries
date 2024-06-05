@@ -60,6 +60,11 @@ CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."terminate_date" is NULL 
 		)
+	AND (	
+	  	"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."deleted_at" is NULL 
+		)
 	
 	GROUP BY "public"."lease_recurring_charges"."lease_id" ,
 		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END,

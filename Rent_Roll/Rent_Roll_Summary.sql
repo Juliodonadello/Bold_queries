@@ -62,6 +62,11 @@ CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."terminate_date" is NULL 
 		)
+	AND (	
+	  	"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."deleted_at" is NULL 
+		)
 	
 	GROUP BY 
 		"public"."lease_recurring_charges"."lease_id",
