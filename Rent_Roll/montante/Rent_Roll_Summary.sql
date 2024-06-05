@@ -232,29 +232,18 @@ FINAL_AUX AS (
 	)
 
 SELECT 
-UNITS."PROP_ID",
-UNITS."PROP_NAME",
-UNITS."UNIT_ID",
-UNITS."UNIT_NAME" "UNIT_NAME" ,
---CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS",
-CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS", -- esto se hizo porque los status future se deben ver como Occupied si el asofdate coincide
-FINAL."TENANT",
-FINAL."lease_created_at" "lease_created_at",
-FINAL."start" "lease_start",
-FINAL."lease_end",	
-UNITS."UNIT_SQ_FT" "UNIT_SQ_FT",
-UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" "UNIT_SQ_FT_fix",
-CASE WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 END AS "Pct of Property",
-CASE WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 ELSE ("UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") / SQ_FT_TEMP."TOT_SQ_FT" * 100 END AS "Pct of Property_fix",
-FINAL."DEPOSIT",
-FINAL."REFUNDABLE",
---LEASES."RCHARGE_ID",
-FINAL."RENT_CHARGE" "RENT_AMOUNT",
-FINAL."OTHER_CHARGE" "OTHER_AMOUNT",
-CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."RENT_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Rent/Sq Ft",
-CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."OTHER_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Other/Sq Ft"
-
-
+	UNITS."PROP_ID",
+	UNITS."PROP_NAME",
+	COUNT(DISTINCT UNITS."UNIT_ID") AS "UNIT_TOT",
+	SUM(CASE
+	  		WHEN (FINAL_AUX."LEASES_COUNT" = 0 OR FINAL_AUX."LEASES_COUNT" IS NULL) THEN UNITS."UNIT_SQ_FT" 
+	  		ELSE UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT"
+	  	END ) AS "PROP_SQ_FT",
+	--SUM(UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") AS  "PROP_SQ_FT",
+	SUM(CASE WHEN (FINAL."LEASE_STATUS"='OCCUPIED') THEN UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" ELSE 0 END) AS "OCCUPIED_UNIT_SQ_FT",
+	SUM(FINAL."RENT_CHARGE") "RENT_AMOUNT_TOT",
+	SUM(FINAL."OTHER_CHARGE") "OTHER_AMOUNT_TOT"
+	
 FROM UNITS
 LEFT JOIN SQ_FT_TEMP
 	ON UNITS."PROP_ID" = SQ_FT_TEMP."PROP_ID"
@@ -264,16 +253,10 @@ LEFT JOIN FINAL_AUX
 	ON FINAL."UNIT_ID" = FINAL_AUX."UNIT_ID"
 INNER JOIN "public"."properties"
 		ON UNITS."PROP_ID" = "public"."properties"."id"
-		
-where  "PROP_NAME" IN (@Property_Name)
-	AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 
-order by UNITS."PROP_NAME",
-	CASE 
-        WHEN UNITS."UNIT_NAME"  LIKE 'APT%' THEN 1  -- Apartments
-		WHEN UNITS."UNIT_NAME"  SIMILAR TO '[0-9][0-9][0-9]-%' THEN 2  -- Units with numbers followed by a hyphen
-        WHEN UNITS."UNIT_NAME"  LIKE 'STOR%' THEN 3 -- Storage Units
-        WHEN UNITS."UNIT_NAME"  LIKE 'GAR%' THEN 4  -- Garages
-        ELSE 5                               -- Other units (if any)
-    END,
-    UNITS."UNIT_NAME"  -- Secondary sort to ensure alphabetical order within each category
+where  "PROP_NAME" IN (@Property_Name)
+ and "public"."properties"."deleted_at" IS NULL
+ AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+
+group by UNITS."PROP_ID",UNITS."PROP_NAME"
+order by "PROP_NAME"

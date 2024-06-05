@@ -7,11 +7,9 @@ WITH CHARGE_CONTROL AS (
   	FROM "public"."properties"
   	INNER JOIN "public"."property_charge_controls"
   		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
-  	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   	
   	WHERE "public"."properties"."name" IN (@Property_Name)
-	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 	),
 CHARGES_TOT AS (
   SELECT 
@@ -151,12 +149,10 @@ SQ_FT_TEMP AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
-  	
+		
 	WHERE "public"."units"."deleted_at" IS NULL
   		AND "public"."properties"."deleted_at" IS NULL
-		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 		
 	GROUP BY  "public"."properties"."id" 
 	),
@@ -168,19 +164,16 @@ UNITS AS (
   		"public"."units"."name" AS "UNIT_NAME",
 		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT",
 		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
-		"public"."units"."unit_class" AS "UNIT_CLASS",
-  		"public"."company_accounts"."company_id" AS "COMPANY_ID"
+		"public"."units"."unit_class" AS "UNIT_CLASS"
   		
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
 	LEFT JOIN "public"."unit_square_footage_items"
 		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
-  	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
-	
+  	
   	WHERE "public"."properties"."deleted_at" IS NULL
-		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 	
 	GROUP BY 
@@ -189,8 +182,7 @@ UNITS AS (
 		"public"."units"."id",
   		"public"."units"."name",
 		"public"."unit_square_footage_items"."square_footage_type",
-		"public"."units"."unit_class",
-  		"public"."company_accounts"."company_id"
+		"public"."units"."unit_class"
 	),
 FINAL AS (
 	select 
@@ -291,7 +283,6 @@ FINAL."RENT_CHARGE" "RENT_AMOUNT",
 FINAL."OTHER_CHARGE" "OTHER_AMOUNT",
 CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."RENT_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Rent/Sq Ft", -- no hace falta armar el campo _fix ya que se hace un promedio ponderado en el total
 CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."OTHER_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Other/Sq Ft",
-"public"."company_accounts"."company_id" "COMPANY_ID",
 FINAL."LEASE_NAME",
 UNITS."SQ_FT_TYPE",
 UNITS."UNIT_CLASS" "UNIT_CLASS" 
@@ -305,12 +296,10 @@ LEFT JOIN FINAL_AUX
 	ON FINAL."UNIT_ID" = FINAL_AUX."UNIT_ID"
 INNER JOIN "public"."properties"
 		ON UNITS."PROP_ID" = "public"."properties"."id"
-INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
 		
 where  	UNITS."PROP_NAME" IN (@Property_Name)
 		AND UNITS."SQ_FT_TYPE" IN (@Sqft_Type)
 		AND UNITS."UNIT_CLASS" IN (@Unit_Class)
-		AND UNITS."COMPANY_ID"  IN (@COMPANY_ID)
+		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 
 order by "PROP_NAME", UNITS."UNIT_NAME"
