@@ -75,11 +75,10 @@ Annual_Lease_History AS (
 	Lease_History."transaction_type_group",
 	Lease_History."lease_id",
 	Lease_History."LEASE_NAME",
-	Lease_History."PROP_NAME",
 	Lease_History."company_relation_id",
 	SUM(Lease_History."MONTHLY_AMOUNT") "ANNUAL_AMOUNT"
   FROM Lease_History
-  GROUP BY 1,2,3,4,5,6
+  GROUP BY 1,2,3,4,5
 ),
 Lease_History_With_Variation AS (
   SELECT 
@@ -117,7 +116,6 @@ FINAL AS (
 	  AND Lease_History_With_Variation."transaction_type_group" = SALES."transaction_type_group"
 	  AND Lease_History_With_Variation."lease_id" = SALES."lease_id"
 	  AND Lease_History_With_Variation."LEASE_NAME" = SALES."LEASE_NAME"
-	  AND Lease_History_With_Variation."PROP_NAME" = SALES."PROP_NAME"
 	  AND Lease_History_With_Variation."company_relation_id" = SALES."company_relation_id"
 
   WHERE CAST(SALES."transaction_type_group" AS TEXT) IN (@Transaction_Type)
@@ -139,26 +137,29 @@ AUX AS (
 	  SELECT 'October' UNION ALL
 	  SELECT 'November' UNION ALL
 	  SELECT 'December'
-)
+),
+AUX_MANY_UNITS AS (
 SELECT 
 AUX."MONTH_NAME" AS"MONTH_NAME" ,
 FINAL."transaction_type",
 FINAL."transaction_type_group",
 FINAL."sales_type",
 FINAL."sales_category",
-FINAL."unit_id",
-FINAL."UNIT_NAME",
+--FINAL."unit_id",
+--FINAL."UNIT_NAME",
 FINAL."lease_id",
 FINAL."LEASE_NAME",
-FINAL."tenant_id",
-FINAL."TENANT_NAME",
-FINAL."PROP_NAME",
+--FINAL."tenant_id",
+--FINAL."TENANT_NAME",
+--FINAL."PROP_NAME",
 FINAL."LEASE_START",
 FINAL."LEASE_END",
+STRING_AGG(DISTINCT FINAL."UNIT_NAME", ', ') AS "UNIT_NAME",
+STRING_AGG(DISTINCT FINAL."TENANT_NAME", ', ') AS "TENANT_NAME",
+STRING_AGG(DISTINCT FINAL."PROP_NAME", ', ') AS "PROP_NAME",
 SUM(CASE WHEN CAST(FINAL."YEAR" AS INT) = 2024 THEN FINAL."MONTHLY_AMOUNT" ELSE 0 END) "2024",
 SUM(CASE WHEN CAST(FINAL."YEAR" AS INT) = 2023 THEN FINAL."MONTHLY_AMOUNT" ELSE 0 END) "2023",
 SUM(CASE WHEN CAST(FINAL."YEAR" AS INT) = 2022 THEN FINAL."MONTHLY_AMOUNT" ELSE 0 END) "2022",
---FINAL."PREV_ANNUAL_AMOUNT",
 MAX(CASE WHEN CAST(FINAL."YEAR" AS INT) = 2024 THEN FINAL."PERCENTAGE_VARIATION" ELSE NULL END) "2024_variation",
 MAX(CASE WHEN CAST(FINAL."YEAR" AS INT) = 2023 THEN FINAL."PERCENTAGE_VARIATION" ELSE NULL END) "2023_variation"
 --,MAX(CASE WHEN CAST(FINAL."PERCENTAGE_VARIATION" AS INT) = 2022 THEN FINAL."MONTHLY_AMOUNT" ELSE NULL END) "2022" -- si pongo else 0 el max me pisa las variation negativas
@@ -170,7 +171,7 @@ FROM AUX
 
 --where FINAL."company_relation_id" = @REAL_COMPANY_ID
 
-GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+GROUP BY 1,2,3,4,5,6,7,8,9
 
 ORDER BY 
   CASE AUX."MONTH_NAME"
@@ -187,4 +188,8 @@ ORDER BY
     WHEN 'November' THEN 11
     WHEN 'December' THEN 12
   END
+)
+SELECT *
+FROM AUX_MANY_UNITS
+
 
