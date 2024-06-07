@@ -138,14 +138,6 @@ AUX AS (
 	  SELECT 'November' UNION ALL
 	  SELECT 'December'
 ),
-Lease_Details AS (
-  SELECT DISTINCT
-    FINAL."LEASE_NAME",
-  	AUX."MONTH_NAME"
-  FROM FINAL
-  FULL  JOIN AUX
-  	ON 1=1
-),
 AUX_MANY_UNITS AS (
 SELECT 
 AUX."MONTH_NAME" AS"MONTH_NAME" ,
@@ -156,7 +148,7 @@ FINAL."sales_category",
 --FINAL."unit_id",
 --FINAL."UNIT_NAME",
 FINAL."lease_id",
-COALESCE(FINAL."LEASE_NAME", Lease_Details."LEASE_NAME") AS "LEASE_NAME",
+FINAL."LEASE_NAME",
 --FINAL."tenant_id",
 --FINAL."TENANT_NAME",
 --FINAL."PROP_NAME",
@@ -176,8 +168,7 @@ MAX(CASE WHEN CAST(FINAL."YEAR" AS INT) = 2023 THEN FINAL."PERCENTAGE_VARIATION"
 FROM AUX
   LEFT  JOIN FINAL
   ON CAST(AUX."MONTH_NAME" AS TEXT) = CAST(FINAL."MONTH_NAME" AS TEXT)
-  LEFT JOIN Lease_Details
-  ON AUX."MONTH_NAME" = Lease_Details."MONTH_NAME"
+
 --where FINAL."company_relation_id" = @REAL_COMPANY_ID
 
 GROUP BY 1,2,3,4,5,6,7,8,9
@@ -197,8 +188,72 @@ ORDER BY
     WHEN 'November' THEN 11
     WHEN 'December' THEN 12
   END
+),
+BREAKPOINT_TOT AS (
+SELECT "public"."rent_percentages"."sales_category",
+"public"."rent_percentages"."sale_type",
+"public"."rent_percentages"."lease_id",
+"public"."breakpoint_items"."effective_date",
+"public"."rent_percentages"."sales_base_amount",
+"public"."breakpoint_entries"."breakpoint_amount",
+"public"."breakpoint_entries"."overage_percent" 
+FROM "public"."rent_percentages" 
+INNER JOIN "public"."breakpoint_items" 
+	ON "public"."rent_percentages"."id"="public"."breakpoint_items"."rent_percentage_id" 
+INNER JOIN "public"."breakpoint_entries" 
+	ON "public"."breakpoint_items"."id"="public"."breakpoint_entries"."breakpoint_item_id"
+
+WHERE "public"."rent_percentages"."sale_type" IN (@Sales_Type)
+  AND "public"."rent_percentages"."sales_category" IN (@Sales_Category)
+  AND "public"."breakpoint_items"."effective_date" <= CURRENT_DATE
+  AND ("public"."breakpoint_entries"."deleted_at" > CURRENT_DATE
+	   		OR "public"."breakpoint_entries"."deleted_at" IS NULL)
+  AND ("public"."breakpoint_items"."deleted_at" > CURRENT_DATE
+	   		OR "public"."breakpoint_items"."deleted_at" IS NULL)
+  AND ("public"."rent_percentages"."deleted_at" > CURRENT_DATE
+	   		OR "public"."rent_percentages"."deleted_at" IS NULL)
+),
+BREAKPOINT_MAX AS (
+SELECT "public"."rent_percentages"."sales_category",
+"public"."rent_percentages"."sale_type",
+"public"."rent_percentages"."lease_id",
+MAX("public"."breakpoint_items"."effective_date") "effective_date"
+FROM "public"."rent_percentages" 
+INNER JOIN "public"."breakpoint_items" 
+	ON "public"."rent_percentages"."id"="public"."breakpoint_items"."rent_percentage_id" 
+INNER JOIN "public"."breakpoint_entries" 
+	ON "public"."breakpoint_items"."id"="public"."breakpoint_entries"."breakpoint_item_id"
+
+WHERE "public"."rent_percentages"."sale_type" IN (@Sales_Type)
+  AND "public"."rent_percentages"."sales_category" IN (@Sales_Category)
+  AND "public"."breakpoint_items"."effective_date" <= CURRENT_DATE
+  
+ GROUP BY 1,2,3
+),
+BREAKPOINT AS (
+SELECT
+BREAKPOINT_TOT."sales_category",
+BREAKPOINT_TOT."sale_type",
+BREAKPOINT_TOT."lease_id",
+BREAKPOINT_TOT."effective_date",
+MAX(BREAKPOINT_TOT."sales_base_amount") "sales_base_amount",
+MAX(BREAKPOINT_TOT."breakpoint_amount") "breakpoint_amount",
+MAX(BREAKPOINT_TOT."overage_percent") "overage_percent" 
+  
+FROM BREAKPOINT_TOT 
+INNER JOIN BREAKPOINT_MAX
+  ON BREAKPOINT_TOT."effective_date" = BREAKPOINT_MAX."effective_date"
+  AND BREAKPOINT_TOT."lease_id" = BREAKPOINT_MAX."lease_id"
+  AND BREAKPOINT_TOT."sale_type" = BREAKPOINT_MAX."sale_type"
+  AND BREAKPOINT_TOT."sales_category" = BREAKPOINT_MAX."sales_category"
+ 
+GROUP BY 1,2,3,4
 )
-SELECT *
+SELECT 
+AUX_MANY_UNITS.*,
+BREAKPOINT."sales_base_amount",
+BREAKPOINT."breakpoint_amount",
+BREAKPOINT."overage_percent"
 FROM AUX_MANY_UNITS
-
-
+LEFT JOIN BREAKPOINT
+	ON AUX_MANY_UNITS."lease_id" = BREAKPOINT."lease_id"
