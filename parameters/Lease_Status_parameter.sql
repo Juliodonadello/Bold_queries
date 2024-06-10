@@ -8,5 +8,8 @@ INNER  JOIN "public"."properties" ON "public"."units"."property_id"="public"."pr
 INNER  JOIN "public"."company_accounts" ON "public"."properties"."company_relation_id"="public"."company_accounts"."id"
 
 WHERE  "public"."leases"."end" IS NOT NULL
-    AND "public"."company_accounts"."company_id" = @COMPANY_ID
+    AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
     AND "public"."properties"."name" IN (@Property_Name)
+    
+    
+GROUP BY "public"."leases"."status" 
