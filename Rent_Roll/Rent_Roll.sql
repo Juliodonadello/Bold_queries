@@ -120,13 +120,16 @@ LEASES AS (
 		AND ("public"."lease_deposits"."deleted_at" >= @AsOfDate OR "public"."lease_deposits"."deleted_at" IS  NULL)
 	LEFT OUTER JOIN "public"."tenants"
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
-  
+	INNER JOIN "public"."properties"
+		ON "public"."properties"."id" = "public"."leases"."property_id"
+	
 	WHERE 
 		(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
   			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
 		)
 		AND "public"."leases"."status" = 'current'
 		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
+		AND "public"."properties"."name" IN (@Property_Name)
   	
   GROUP BY
   		"public"."leases"."id",

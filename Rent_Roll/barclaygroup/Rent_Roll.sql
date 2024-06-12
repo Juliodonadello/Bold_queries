@@ -7,11 +7,9 @@ WITH CHARGE_CONTROL AS (
   	FROM "public"."properties"
   	INNER JOIN "public"."property_charge_controls"
   		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
-  	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   	
   	WHERE "public"."properties"."name" IN (@Property_Name)
-	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 	),
 CHARGES_TOT AS (
   SELECT 
@@ -31,7 +29,6 @@ CHARGES_TOT AS (
 	--INNER JOIN "public"."leases_units_units"  --aumenta los registros pero esta bien que se duplique un lease con distintas units
   	--	ON "public"."lease_recurring_charges"."lease_id" ="public"."leases_units_units"."leasesId"
  	 INNER JOIN "public"."units"
-  		--ON "public"."leases_units_units"."unitsId" =  "public"."units"."id"
   		ON "public"."lease_recurring_charges"."unit_id" =  "public"."units"."id"
   	INNER JOIN CHARGE_CONTROL
   		ON CHARGE_CONTROL. "PROP_ID" = "public"."units"."property_id"
@@ -67,7 +64,7 @@ CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."deleted_at" is NULL 
 		)
-	
+		
 	GROUP BY 
 		"public"."lease_recurring_charges"."lease_id",
 		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END ,
@@ -122,9 +119,7 @@ LEASES AS (
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id"
 	INNER JOIN "public"."properties"
 		ON "public"."properties"."id" = "public"."leases"."property_id"
-	
-  	
-	
+
   
 	WHERE 
 		(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
@@ -174,14 +169,12 @@ SQ_FT_TEMP AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-  	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
-  
-  WHERE "public"."units"."deleted_at" IS NULL
-  	and "public"."properties"."deleted_at" IS NULL
-	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	
+  	WHERE "public"."units"."deleted_at" IS NULL
+  		AND "public"."properties"."deleted_at" IS NULL
+		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 		
-	GROUP BY  "public"."properties"."id" 
+	GROUP BY  "public"."properties"."id"
 	),
 UNITS AS (
   SELECT 
@@ -194,11 +187,9 @@ UNITS AS (
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
-  
-  	WHERE "public"."units"."deleted_at" IS NULL
-  		AND "public"."properties"."deleted_at" IS NULL
+
+  	WHERE "public"."properties"."deleted_at" IS NULL
+		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 	
 	GROUP BY 
@@ -242,23 +233,150 @@ FINAL_AUX AS (
     "UNIT_ID"
     FROM FINAL
     GROUP BY "UNIT_ID"
-	)
+	),
+RENT_SCALATIONS AS (
+  SELECT 
+  		"public"."lease_recurring_charges"."lease_id" AS "LEASE_ID",
+		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "RENT_CHARGE_SCAL",
+  		--CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 0 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "OTHER_CHARGE",
+  		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE_SCAL",
+  		"public"."units"."property_id" "PROP_ID",
+  		"public"."lease_recurring_charges"."unit_id" "UNIT_ID"
+  
+	FROM "public"."lease_recurring_charges"
+	LEFT OUTER JOIN "public"."lease_recurring_charge_amounts"
+		ON "public"."lease_recurring_charges"."id" = "public"."lease_recurring_charge_amounts"."recurring_charge_id"
+ 	INNER JOIN "public"."units"
+  		ON "public"."lease_recurring_charges"."unit_id" =  "public"."units"."id"
+  	INNER JOIN CHARGE_CONTROL
+  		ON CHARGE_CONTROL. "PROP_ID" = "public"."units"."property_id"
+  		AND CHARGE_CONTROL. "ITEM_ID" = "public"."lease_recurring_charges"."order_entry_item_id"
+	INNER JOIN "public"."properties"
+		ON "public"."properties"."id" = "public"."units"."property_id"
+  
+  	WHERE "public"."lease_recurring_charge_amounts"."effective_date" > @AsOfDate
+	AND (
+		"public"."lease_recurring_charge_amounts"."deleted_at" > @AsOfDate 
+		OR 
+		"public"."lease_recurring_charge_amounts"."deleted_at" IS NULL
+		)
+	AND (
+		"public"."lease_recurring_charges"."deleted_at" > @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."deleted_at" IS NULL
+		)
+	AND (
+		"public"."lease_recurring_charge_amounts"."frequency" != 'One Time' --not a one time charge 
+		--OR
+		/*(
+			"public"."lease_recurring_charge_amounts"."frequency" = 'One Time'
+			AND	 CAST(EXTRACT(DAY FROM (@AsOfDate - "public"."lease_recurring_charge_amounts"."effective_date")) AS INTEGER) > 0
+		  	AND CAST(EXTRACT(DAY FROM (@AsOfDate - "public"."lease_recurring_charge_amounts"."effective_date")) AS INTEGER) < 31
+		)--one time charge with less than a month differnce
+		-- COMMENTED BECAUSE ON TIME ARE NOT CONSIDER SCALATIONS
+		*/
+		)
+	AND (	
+	  	"public"."lease_recurring_charges"."terminate_date" > @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."terminate_date" is NULL 
+		)
+	AND (	
+	  	"public"."lease_recurring_charges"."deleted_at" > @AsOfDate
+		OR
+		"public"."lease_recurring_charges"."deleted_at" is NULL 
+		)
+	AND "public"."properties"."name" IN (@Property_Name)
+		
+	GROUP BY 
+		"public"."lease_recurring_charges"."lease_id",
+		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END,
+		"public"."lease_recurring_charge_amounts"."effective_date",
+		"public"."units"."property_id",
+		"public"."lease_recurring_charges"."unit_id"
+	ORDER BY 
+			"public"."units"."property_id",
+			"public"."lease_recurring_charges"."unit_id",
+			"public"."lease_recurring_charges"."lease_id",
+			"public"."lease_recurring_charge_amounts"."effective_date" ASC
+	),
+RENT_SCALATIONS_AUX AS (
+	SELECT 
+  			RENT_SCALATIONS."PROP_ID",
+			RENT_SCALATIONS."UNIT_ID",
+			SUM(CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN 1 ELSE 0 END) AS "COUNT_RENT_CHARGE_SCAL"
 
+	FROM RENT_SCALATIONS
+  	INNER JOIN CHARGE_CONTROL
+  		ON RENT_SCALATIONS."PROP_ID" = CHARGE_CONTROL."PROP_ID"
+
+	GROUP BY 1,2
+	ORDER BY RENT_SCALATIONS."PROP_ID",
+			RENT_SCALATIONS."UNIT_ID"
+),
+RENT_SCALATIONS_FINAL AS (
+	SELECT 
+  			RENT_SCALATIONS."PROP_ID",
+			RENT_SCALATIONS."UNIT_ID",
+			RENT_SCALATIONS."LEASE_ID",
+  			RENT_SCALATIONS."RENT_CHARGE_SCAL",
+			RENT_SCALATIONS."EFFECTIVE_DATE_SCAL",
+			MAX(RENT_SCALATIONS_AUX."COUNT_RENT_CHARGE_SCAL") "COUNT_RENT_CHARGE_SCAL"
+
+	FROM RENT_SCALATIONS
+  	LEFT JOIN RENT_SCALATIONS_AUX
+  		ON RENT_SCALATIONS."PROP_ID" = RENT_SCALATIONS_AUX."PROP_ID"
+  		AND RENT_SCALATIONS."UNIT_ID" = RENT_SCALATIONS_AUX."UNIT_ID"
+
+	GROUP BY 1,2,3,4,5
+	ORDER BY RENT_SCALATIONS."PROP_ID",
+			RENT_SCALATIONS."UNIT_ID",
+			RENT_SCALATIONS."LEASE_ID",
+			RENT_SCALATIONS."EFFECTIVE_DATE_SCAL" ASC
+)
 
 SELECT 
-	UNITS."PROP_ID",
-	UNITS."PROP_NAME",
-	COUNT(DISTINCT UNITS."UNIT_ID") AS "UNIT_TOT",
-	SUM(CASE
-	  		WHEN (FINAL_AUX."LEASES_COUNT" = 0 OR FINAL_AUX."LEASES_COUNT" IS NULL) THEN UNITS."UNIT_SQ_FT" 
-	  		ELSE UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT"
-	  	END ) AS "PROP_SQ_FT",
-	--SUM(UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") AS  "PROP_SQ_FT",
-	SUM(CASE WHEN (FINAL."LEASE_STATUS"='OCCUPIED') THEN UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" ELSE 0 END) AS "OCCUPIED_UNIT_SQ_FT",
-	SUM(FINAL."RENT_CHARGE") "RENT_AMOUNT_TOT",
-	SUM(FINAL."OTHER_CHARGE") "OTHER_AMOUNT_TOT",
-	"public"."company_accounts"."company_id" "COMPANY_ID"
+UNITS."PROP_ID",
+UNITS."PROP_NAME",
+UNITS."UNIT_ID",
+UNITS."UNIT_NAME" "UNIT_NAME" ,
+FINAL."LEASE_ID",
+--CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS",
+CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS", -- esto se hizo porque los status future se deben ver como Occupied si el asofdate coincide
+FINAL."TENANT",
+FINAL."lease_created_at" "lease_created_at",
+FINAL."start" "lease_start",
+FINAL."lease_end",	
+UNITS."UNIT_SQ_FT" "UNIT_SQ_FT",
+FINAL_AUX."LEASES_COUNT",
+RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL",
+CASE 	WHEN (FINAL_AUX."LEASES_COUNT"<2 AND RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL" < 2)
+						OR (FINAL_AUX."LEASES_COUNT" is null OR RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL" is null) THEN UNITS."UNIT_SQ_FT"
+			WHEN FINAL_AUX."LEASES_COUNT" > RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL" THEN UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT"
+			ELSE UNITS."UNIT_SQ_FT"/RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL"
+	END AS "UNIT_SQ_FT_fix",
+
+CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 
+			ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
+	END AS "Pct of Property",
+
+CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0
+			WHEN (FINAL_AUX."LEASES_COUNT"<2 AND RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL" < 2)
+						OR (FINAL_AUX."LEASES_COUNT" is null OR RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL" is null) THEN UNITS."UNIT_SQ_FT"/ SQ_FT_TEMP."TOT_SQ_FT" * 100 
+			WHEN FINAL_AUX."LEASES_COUNT" > RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL" THEN UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT"/ SQ_FT_TEMP."TOT_SQ_FT" * 100 
+			ELSE UNITS."UNIT_SQ_FT"/RENT_SCALATIONS_FINAL."COUNT_RENT_CHARGE_SCAL"/ SQ_FT_TEMP."TOT_SQ_FT" * 100 
+	END AS "Pct of Property_fix",
 	
+FINAL."DEPOSIT",
+FINAL."REFUNDABLE",
+--LEASES."RCHARGE_ID",
+FINAL."RENT_CHARGE" "RENT_AMOUNT",
+FINAL."OTHER_CHARGE" "OTHER_AMOUNT",
+CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."RENT_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Rent/Sq Ft",
+CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."OTHER_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Other/Sq Ft",
+RENT_SCALATIONS_FINAL."RENT_CHARGE_SCAL",
+RENT_SCALATIONS_FINAL."EFFECTIVE_DATE_SCAL"
+
 FROM UNITS
 LEFT JOIN SQ_FT_TEMP
 	ON UNITS."PROP_ID" = SQ_FT_TEMP."PROP_ID"
@@ -267,13 +385,17 @@ LEFT JOIN FINAL
 LEFT JOIN FINAL_AUX
 	ON FINAL."UNIT_ID" = FINAL_AUX."UNIT_ID"
 INNER JOIN "public"."properties"
-		ON UNITS."PROP_ID" = "public"."properties"."id"
-INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
+	ON UNITS."PROP_ID" = "public"."properties"."id"
+LEFT JOIN RENT_SCALATIONS_FINAL
+	ON RENT_SCALATIONS_FINAL."PROP_ID" = UNITS."PROP_ID"
+	AND RENT_SCALATIONS_FINAL."UNIT_ID" = UNITS."UNIT_ID"
+	--AND RENT_SCALATIONS_FINAL."LEASE_ID" = FINAL."LEASE_ID"
 
 where  "PROP_NAME" IN (@Property_Name)
- and "public"."properties"."deleted_at" IS NULL
- AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 
-group by UNITS."PROP_ID",UNITS."PROP_NAME","COMPANY_ID"
-order by "PROP_NAME"
+
+order by "PROP_NAME", UNITS."UNIT_NAME",
+			RENT_SCALATIONS_FINAL."EFFECTIVE_DATE_SCAL" ASC
+
+
