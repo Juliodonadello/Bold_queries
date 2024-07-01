@@ -14,10 +14,16 @@ WITH LEASES_SALES AS (
     EXTRACT(YEAR FROM "public"."sales_entry"."transaction_date") AS "transaction_year",
     "public"."sales_entry"."sales_volume" AS "sales_volume",
     "public"."leases_units_units"."unitsId" AS "UNIT_ID",  		
-    "public"."tenants"."name" AS "TENANT"
+    "public"."tenants"."name" AS "TENANT",
+    "public"."units"."name" AS "UNIT_NAME",
+    "public"."units"."total_square_footage" AS "UNIT_SQ_FT",
+    "public"."properties"."name" AS "PROP_NAME"
+
   FROM "public"."leases"
   INNER JOIN "public"."leases_units_units"
     ON "public"."leases"."id" = "public"."leases_units_units"."leasesId"
+  INNER JOIN "public"."units"
+    ON "public"."units"."id" = "public"."leases_units_units"."unitsId"
   INNER JOIN "public"."properties"
     ON "public"."properties"."id" = "public"."leases"."property_id"
   INNER JOIN "public"."rent_percentages"
@@ -30,7 +36,7 @@ WITH LEASES_SALES AS (
     (("public"."rent_percentages"."overage_start_date" < CURRENT_DATE AND "public"."rent_percentages"."overage_end_date" > CURRENT_DATE)
     OR ("public"."rent_percentages"."overage_start_date" < CURRENT_DATE AND "public"."rent_percentages"."overage_end_date" IS NULL))
     AND "public"."properties"."name" IN (@Property_Name)
-    AND "public"."properties"."company_relation_id" = @REAL_COMPANY_ID
+    AND CAST("public"."properties"."company_relation_id" AS TEXT) = CAST(@REAL_COMPANY_ID AS TEXT)
     AND ("public"."leases"."deleted_at" >= CURRENT_DATE OR "public"."leases"."deleted_at" IS NULL)
     AND ("public"."rent_percentages"."deleted_at" >= CURRENT_DATE OR "public"."rent_percentages"."deleted_at" IS NULL)
     AND ("public"."sales_entry"."deleted_at" >= CURRENT_DATE OR "public"."sales_entry"."deleted_at" IS NULL)
@@ -47,7 +53,9 @@ MONTH_SALES AS (
     "MONTHS_FRECUENCY",
     "ITEM_ID",
     "TYPE_REQUIRED",
-    STRING_AGG(DISTINCT "UNIT_ID"::TEXT, '/') AS "UNIT_ID",
+    "PROP_NAME",
+    STRING_AGG(DISTINCT "UNIT_NAME"::TEXT, '/') AS "UNIT_NAME",
+    MAX("UNIT_SQ_FT") AS "UNIT_SQ_FT",
     STRING_AGG(DISTINCT "TENANT", '/') AS "TENANT",
     SUM(CASE WHEN TO_CHAR("transaction_date", 'YYYY-MM') = TO_CHAR(CURRENT_DATE - INTERVAL '0 month', 'YYYY-MM') THEN "sales_volume" ELSE 0 END) AS "current_month",
     SUM(CASE WHEN TO_CHAR("transaction_date", 'YYYY-MM') = TO_CHAR(CURRENT_DATE - INTERVAL '1 month', 'YYYY-MM') THEN "sales_volume" ELSE 0 END) AS "previous_month_1",
@@ -74,7 +82,23 @@ MONTH_SALES AS (
     SUBSTRING(TO_CHAR(CURRENT_DATE - INTERVAL '9 months', 'Month'), 1, 3) AS "previous_month_9_name",
     SUBSTRING(TO_CHAR(CURRENT_DATE - INTERVAL '10 months', 'Month'), 1, 3) AS "previous_month_10_name",
     SUBSTRING(TO_CHAR(CURRENT_DATE - INTERVAL '11 months', 'Month'), 1, 3) AS "previous_month_11_name",
-    SUBSTRING(TO_CHAR(CURRENT_DATE - INTERVAL '12 months', 'Month'), 1, 3) AS "previous_month_12_name"
+    SUBSTRING(TO_CHAR(CURRENT_DATE - INTERVAL '12 months', 'Month'), 1, 3) AS "previous_month_12_name",
+    
+    CURRENT_DATE AS "current_month_date",
+    CURRENT_DATE - INTERVAL '1 month' AS "previous_month_1_date",
+    CURRENT_DATE - INTERVAL '2 months' AS "previous_month_2_date",
+    CURRENT_DATE - INTERVAL '3 months' AS "previous_month_3_date",
+    CURRENT_DATE - INTERVAL '4 months' AS "previous_month_4_date",
+    CURRENT_DATE - INTERVAL '5 months' AS "previous_month_5_date",
+    CURRENT_DATE - INTERVAL '6 months' AS "previous_month_6_date",
+    CURRENT_DATE - INTERVAL '7 months' AS "previous_month_7_date",
+    CURRENT_DATE - INTERVAL '8 months' AS "previous_month_8_date",
+    CURRENT_DATE - INTERVAL '9 months' AS "previous_month_9_date",
+    CURRENT_DATE - INTERVAL '10 months' AS "previous_month_10_date",
+    CURRENT_DATE - INTERVAL '11 months' AS "previous_month_11_date",
+    CURRENT_DATE - INTERVAL '12 months' AS "previous_month_12_date"
+
+
   FROM LEASES_SALES
   GROUP BY 
     "LEASE_ID",
@@ -85,6 +109,91 @@ MONTH_SALES AS (
     "overage_end_date",
     "MONTHS_FRECUENCY",
     "ITEM_ID",
-    "TYPE_REQUIRED"
+    "TYPE_REQUIRED",
+    "PROP_NAME"
 )
-SELECT * FROM MONTH_SALES;
+SELECT 
+"LEASE_ID",
+"LEASE_NAME",
+"start",
+"lease_end",
+"overage_start_date",
+"overage_end_date",
+"MONTHS_FRECUENCY",
+"ITEM_ID",
+"TYPE_REQUIRED",
+"PROP_NAME",
+"UNIT_NAME",
+"UNIT_SQ_FT",
+"TENANT",
+"current_month_name","previous_month_1_name","previous_month_2_name","previous_month_3_name","previous_month_4_name","previous_month_5_name","previous_month_6_name",
+"previous_month_7_name","previous_month_8_name", "previous_month_9_name","previous_month_10_name","previous_month_11_name","previous_month_12_name",
+CASE WHEN "current_month_date" < ("overage_start_date" + INTERVAL '1 day') OR "current_month_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "current_month_date" >= "overage_start_date" AND "current_month_date" <= "overage_end_date" AND "current_month" > 0 THEN 'CER' -- Sales Registered
+      WHEN "current_month_date" >= "overage_start_date" AND "current_month_date" <= "overage_end_date" AND ("current_month" = 0 or "current_month" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_current_month",
+CASE WHEN "previous_month_1_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_1_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_1_date" >= "overage_start_date" AND "previous_month_1_date" <= "overage_end_date" AND "previous_month_1" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_1_date" >= "overage_start_date" AND "previous_month_1_date" <= "overage_end_date" AND ("previous_month_1" = 0 or "previous_month_1" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_1",
+CASE WHEN "previous_month_2_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_2_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_2_date" >= "overage_start_date" AND "previous_month_2_date" <= "overage_end_date" AND "previous_month_2" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_2_date" >= "overage_start_date" AND "previous_month_2_date" <= "overage_end_date" AND ("previous_month_2" = 0 or "previous_month_2" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_2",
+CASE WHEN "previous_month_3_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_3_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_3_date" >= "overage_start_date" AND "previous_month_3_date" <= "overage_end_date" AND "previous_month_3" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_3_date" >= "overage_start_date" AND "previous_month_3_date" <= "overage_end_date" AND ("previous_month_3" = 0 or "previous_month_3" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_3",
+CASE WHEN "previous_month_4_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_4_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_4_date" >= "overage_start_date" AND "previous_month_4_date" <= "overage_end_date" AND "previous_month_4" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_4_date" >= "overage_start_date" AND "previous_month_4_date" <= "overage_end_date" AND ("previous_month_4" = 0 or "previous_month_4" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_4",
+CASE WHEN "previous_month_5_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_5_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_5_date" >= "overage_start_date" AND "previous_month_5_date" <= "overage_end_date" AND "previous_month_5" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_5_date" >= "overage_start_date" AND "previous_month_5_date" <= "overage_end_date" AND ("previous_month_5" = 0 or "previous_month_5" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_5",
+CASE WHEN "previous_month_6_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_6_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_6_date" >= "overage_start_date" AND "previous_month_6_date" <= "overage_end_date" AND "previous_month_6" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_6_date" >= "overage_start_date" AND "previous_month_6_date" <= "overage_end_date" AND ("previous_month_6" = 0 or "previous_month_6" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_6",
+CASE WHEN "previous_month_7_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_7_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_7_date" >= "overage_start_date" AND "previous_month_7_date" <= "overage_end_date" AND "previous_month_7" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_7_date" >= "overage_start_date" AND "previous_month_7_date" <= "overage_end_date" AND ("previous_month_7" = 0 or "previous_month_7" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_7",
+CASE WHEN "previous_month_8_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_8_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_8_date" >= "overage_start_date" AND "previous_month_8_date" <= "overage_end_date" AND "previous_month_8" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_8_date" >= "overage_start_date" AND "previous_month_8_date" <= "overage_end_date" AND ("previous_month_8" = 0 or "previous_month_8" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_8",
+CASE WHEN "previous_month_9_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_9_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_9_date" >= "overage_start_date" AND "previous_month_9_date" <= "overage_end_date" AND "previous_month_9" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_9_date" >= "overage_start_date" AND "previous_month_9_date" <= "overage_end_date" AND ("previous_month_9" = 0 or "previous_month_9" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_9",
+CASE WHEN "previous_month_10_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_10_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_10_date" >= "overage_start_date" AND "previous_month_10_date" <= "overage_end_date" AND "previous_month_10" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_10_date" >= "overage_start_date" AND "previous_month_10_date" <= "overage_end_date" AND ("previous_month_10" = 0 or "previous_month_10" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_10",
+CASE WHEN "previous_month_11_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_11_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_11_date" >= "overage_start_date" AND "previous_month_11_date" <= "overage_end_date" AND "previous_month_11" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_11_date" >= "overage_start_date" AND "previous_month_11_date" <= "overage_end_date" AND ("previous_month_11" = 0 or "previous_month_11" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_11",
+CASE WHEN "previous_month_12_date" < ("overage_start_date" + INTERVAL '1 day') OR "previous_month_12_date" > "overage_end_date" THEN '   ' --Not Required
+      WHEN "previous_month_12_date" >= "overage_start_date" AND "previous_month_12_date" <= "overage_end_date" AND "previous_month_12" > 0 THEN 'CER' -- Sales Registered
+      WHEN "previous_month_12_date" >= "overage_start_date" AND "previous_month_12_date" <= "overage_end_date" AND ("previous_month_12" = 0 or "previous_month_12" is null) THEN ' * ' -- Sales missing
+      ELSE 'Not_end' --Not configured
+END AS "status_previous_month_12"
+
+
+FROM MONTH_SALES
+
