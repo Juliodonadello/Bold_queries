@@ -22,28 +22,31 @@ CHARGES_TOT AS (
       AND ("lease_recurring_charge_amounts"."deleted_at" >= @To_Date OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
       AND ("lease_recurring_charges"."deleted_at" >= @To_Date OR "lease_recurring_charges"."deleted_at" IS NULL)
       AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
-      AND "lease_recurring_charge_amounts"."frequency" != 'One Time'
-      OR ("lease_recurring_charge_amounts"."frequency" = 'One Time'
-          AND EXTRACT(DAY FROM (@From_Date - "lease_recurring_charge_amounts"."effective_date")) > 0
-          AND EXTRACT(DAY FROM (@From_Date - "lease_recurring_charge_amounts"."effective_date")) < 31)
+	AND "units"."property_id" = 1705 --120 Broadway
 ),
-monthly_rent AS (
+charged_amounts AS (
     SELECT
         ds."month",
         ct."LEASE_ID",
+        ct."EFFECTIVE_DATE",
         ct."AMOUNT",
         ct."ITEM_ID",
         ct."PROP_ID",
-        ct."UNIT_ID"
+        ct."UNIT_ID",
+        ROW_NUMBER() OVER (PARTITION BY ct."LEASE_ID", ct."ITEM_ID", ds."month" ORDER BY ct."EFFECTIVE_DATE" DESC) AS rn
     FROM
         date_series ds
-    LEFT JOIN LATERAL (
-        SELECT * FROM CHARGES_TOT ct
-        WHERE ct."EFFECTIVE_DATE" <= ds."month"
-        ORDER BY ct."EFFECTIVE_DATE" DESC
-        LIMIT 1
-    ) ct ON true
+    CROSS JOIN CHARGES_TOT ct
+    WHERE ds."month" >= ct."EFFECTIVE_DATE"
 )
-SELECT *
-FROM monthly_rent
-ORDER BY "PROP_ID", "LEASE_ID", "month"
+SELECT
+    ds."month",
+    ca."LEASE_ID",
+    COALESCE(ca."AMOUNT", 0) AS "AMOUNT",
+    ca."ITEM_ID",
+    ca."PROP_ID",
+    ca."UNIT_ID"
+FROM
+    date_series ds
+LEFT JOIN charged_amounts ca ON ds."month" = ca."month" AND ca.rn = 1
+ORDER BY ca."PROP_ID", ca."LEASE_ID", ca."ITEM_ID", ds."month";
