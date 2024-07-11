@@ -1,6 +1,6 @@
-# Report Repository
+# Reports Repository
 
-This repository contains `standard reports` and `customizations` for clients. Each folder includes a standard report, with subfolders for client-specific customizations. The `parameters` table contains common queries for users to filter the reports.
+This repository contains `standard reports` and `customizations` for clients. Each folder includes a standard report, with subfolders for client-specific customizations. The `parameters` folder contains common queries for users to filter the reports.
 
 ## Folder Structure
 
@@ -8,12 +8,12 @@ This repository contains `standard reports` and `customizations` for clients. Ea
 report-repo/
 │ 
 ├── standard-report-1/
-│   ├── queries-standard/
+│   ├── queries-standard
 │   └── customization-client-name/
 │       └── queries
 │ 
 ├── standard-report-2/
-│   ├── queries-standard/
+│   ├── queries-standard
 │   └── customization-client-name/
 │       └── queries
 │ 
