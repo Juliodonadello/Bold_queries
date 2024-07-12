@@ -18,16 +18,16 @@ CHARGES_TOT AS (
         ON "lease_recurring_charges"."id" = "lease_recurring_charge_amounts"."recurring_charge_id"
     INNER JOIN "public"."units"
         ON "lease_recurring_charges"."unit_id" =  "units"."id"
-      INNER JOIN "public"."properties"
+    INNER JOIN "public"."properties"
         ON "units"."property_id" =  "properties"."id"
   
     WHERE "lease_recurring_charge_amounts"."effective_date" <= @To_Date
-		AND ("lease_recurring_charge_amounts"."deleted_at" >= @To_Date OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
-		AND ("lease_recurring_charges"."deleted_at" >= @To_Date OR "lease_recurring_charges"."deleted_at" IS NULL)
-		AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
-		AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
-		AND "public"."properties"."name" IN (@Property_Name)
-	    AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+        AND ("lease_recurring_charge_amounts"."deleted_at" >= @To_Date OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
+        AND ("lease_recurring_charges"."deleted_at" >= @To_Date OR "lease_recurring_charges"."deleted_at" IS NULL)
+        AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
+        AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
+        AND "public"."properties"."name" IN (@Property_Name)
+        AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 ),
 charged_amounts AS (
     SELECT
@@ -48,7 +48,6 @@ FINAL_TO_PIVOT AS (
     SELECT
         ds."month" as "TIME_STAMP",
         EXTRACT(MONTH FROM ds."month") AS "MONTH",
-        --SUBSTRING(TO_CHAR(ds."month", 'Month'), 1, 3) AS "MONTH_NAME",
         EXTRACT(YEAR FROM ds."month") AS "YEAR",
         ca."LEASE_ID",
         COALESCE(ca."AMOUNT", 0) AS "AMOUNT",
@@ -61,38 +60,49 @@ FINAL_TO_PIVOT AS (
     ORDER BY ca."PROP_ID", ca."LEASE_ID", ca."ITEM_ID", ds."month"
 )
 SELECT
-    --fp."PROP_ID",
-	--fp."LEASE_ID", 
-	--fp."UNIT_ID", --ver si no rompe la granularidad cuando lo sumamos al group by
-	fp."ITEM_ID",
+    fp."ITEM_ID",
     "public"."leases"."name",
     "public"."leases"."start",
     "public"."leases"."end",
-	"public"."tenants"."name" AS "tenants_name",
+    "public"."tenants"."name" AS "tenants_name",
     "public"."properties"."name" AS "property_name",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 1 THEN "AMOUNT" ELSE 0 END) AS "Month 1",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 2 THEN "AMOUNT" ELSE 0 END) AS "Month 2",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 3 THEN "AMOUNT" ELSE 0 END) AS "Month 3",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 4 THEN "AMOUNT" ELSE 0 END) AS "Month 4",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 5 THEN "AMOUNT" ELSE 0 END) AS "Month 5",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 6 THEN "AMOUNT" ELSE 0 END) AS "Month 6",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 7 THEN "AMOUNT" ELSE 0 END) AS "Month 7",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 8 THEN "AMOUNT" ELSE 0 END) AS "Month 8",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 9 THEN "AMOUNT" ELSE 0 END) AS "Month 9",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 10 THEN "AMOUNT" ELSE 0 END) AS "Month 10",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 11 THEN "AMOUNT" ELSE 0 END) AS "Month 11",
-    SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" AND "MONTH" = 12 THEN "AMOUNT" ELSE 0 END) AS "Month 12",
-	SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date) = fp."YEAR" THEN "AMOUNT" ELSE 0 END) AS "YEAR 1",
-	SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date)+1 = fp."YEAR" THEN "AMOUNT" ELSE 0 END) AS "YEAR 2",
-	SUM(CASE WHEN EXTRACT(YEAR FROM @From_Date)+2 = fp."YEAR" THEN "AMOUNT" ELSE 0 END) AS "YEAR 3"
-
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '0 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 1",
+    TO_CHAR(@From_Date + INTERVAL '0 month', 'Mon, YY') AS "month_1_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '1 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 2",
+    TO_CHAR(@From_Date + INTERVAL '1 month', 'Mon, YY') AS "month_2_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '2 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 3",
+    TO_CHAR(@From_Date + INTERVAL '2 month', 'Mon, YY') AS "month_3_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '3 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 4",
+    TO_CHAR(@From_Date + INTERVAL '3 month', 'Mon, YY') AS "month_4_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '4 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 5",
+    TO_CHAR(@From_Date + INTERVAL '4 month', 'Mon, YY') AS "month_5_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '5 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 6",
+    TO_CHAR(@From_Date + INTERVAL '5 month', 'Mon, YY') AS "month_6_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '6 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 7",
+    TO_CHAR(@From_Date + INTERVAL '6 month', 'Mon, YY') AS "month_7_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '7 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 8",
+    TO_CHAR(@From_Date + INTERVAL '7 month', 'Mon, YY') AS "month_8_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '8 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 9",
+    TO_CHAR(@From_Date + INTERVAL '8 month', 'Mon, YY') AS "month_9_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '9 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 10",
+    TO_CHAR(@From_Date + INTERVAL '9 month', 'Mon, YY') AS "month_10_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '10 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 11",
+    TO_CHAR(@From_Date + INTERVAL '10 month', 'Mon, YY') AS "month_11_name",
+    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '11 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 12",
+    TO_CHAR(@From_Date + INTERVAL '11 month', 'Mon, YY') AS "month_12_name",
+    SUM(CASE WHEN DATE_TRUNC('year', @From_Date) = DATE_TRUNC('year', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "YEAR 1",
+    EXTRACT(YEAR FROM @From_Date) AS "year_1_name",
+    SUM(CASE WHEN DATE_TRUNC('year', @From_Date + INTERVAL '1 year') = DATE_TRUNC('year', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "YEAR 2",
+    EXTRACT(YEAR FROM @From_Date + INTERVAL '1 year') AS "year_2_name",
+    SUM(CASE WHEN DATE_TRUNC('year', @From_Date + INTERVAL '2 year') = DATE_TRUNC('year', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "YEAR 3",
+    EXTRACT(YEAR FROM @From_Date + INTERVAL '2 year') AS "year_3_name"
 FROM
     FINAL_TO_PIVOT as fp
 INNER JOIN "public"."leases" ON fp."LEASE_ID" = "public"."leases"."id"
-INNER  JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
-INNER  JOIN "public"."properties" ON fp."PROP_ID"="public"."properties"."id"
-
+INNER JOIN "public"."tenants" ON "public"."tenants"."id" = "public"."leases"."primaryTenantId"
+INNER JOIN "public"."properties" ON fp."PROP_ID" = "public"."properties"."id"
 GROUP BY
-    1,2,3,4,5,6
+    1, 2, 3, 4, 5, 6
 ORDER BY
-   1,2,4
+    1, 2, 4;
+
