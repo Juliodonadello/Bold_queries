@@ -1,4 +1,4 @@
-SELECT "public"."leases"."status" "LEASE_STATUS"
+SELECT "public"."leases"."month_to_month" "M_t_M"
 
 FROM "public"."leases"
 INNER  JOIN "public"."leases_units_units" ON "public"."leases"."id"="public"."leases_units_units"."leasesId"
@@ -10,4 +10,4 @@ WHERE  "public"."leases"."end" IS NOT NULL
     AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
     AND "public"."properties"."name" IN (@Property_Name)
     
-GROUP BY "public"."leases"."status" 
+GROUP BY "public"."leases"."month_to_month" 

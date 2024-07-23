@@ -12,7 +12,9 @@ CHARGES_TOT AS (
         "lease_recurring_charge_amounts"."amount" AS "AMOUNT",
         "lease_recurring_charges"."order_entry_item_id" AS "ITEM_ID",
         "units"."property_id" AS "PROP_ID",
-        "lease_recurring_charges"."unit_id" AS "UNIT_ID"
+        "lease_recurring_charges"."unit_id" AS "UNIT_ID",
+  		"public"."leases"."end" AS "LEASE_END"
+  
     FROM "public"."lease_recurring_charges"
     INNER JOIN "public"."lease_recurring_charge_amounts"
         ON "lease_recurring_charges"."id" = "lease_recurring_charge_amounts"."recurring_charge_id"
@@ -20,6 +22,8 @@ CHARGES_TOT AS (
         ON "lease_recurring_charges"."unit_id" =  "units"."id"
     INNER JOIN "public"."properties"
         ON "units"."property_id" =  "properties"."id"
+  	INNER JOIN "public"."leases" 
+  		ON "lease_recurring_charges"."lease_id" = "public"."leases"."id"
   
     WHERE "lease_recurring_charge_amounts"."effective_date" <= @To_Date
         AND ("lease_recurring_charge_amounts"."deleted_at" >= @To_Date OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
@@ -28,21 +32,28 @@ CHARGES_TOT AS (
         AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
         AND "public"."properties"."name" IN (@Property_Name)
         AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+  		AND "lease_recurring_charge_amounts"."effective_date" <= "public"."leases"."end"
 ),
 charged_amounts AS (
     SELECT
         ds."month",
         ct."LEASE_ID",
         ct."EFFECTIVE_DATE",
-        ct."AMOUNT",
+        ct."AMOUNT" AS "AMOUNT_OLD",
+  		CASE WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
+				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")  ) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 30
+  				ELSE ct."AMOUNT" 
+  		END AS "AMOUNT",
         ct."ITEM_ID",
         ct."PROP_ID",
         ct."UNIT_ID",
-        ROW_NUMBER() OVER (PARTITION BY ct."LEASE_ID", ct."ITEM_ID", ds."month" ORDER BY ct."EFFECTIVE_DATE" DESC) AS rn
+        ROW_NUMBER() OVER (PARTITION BY ct."LEASE_ID", ct."ITEM_ID", ds."month" ORDER BY ct."EFFECTIVE_DATE" DESC) AS rn,
+  		ct."LEASE_END" 
     FROM
         date_series ds
     CROSS JOIN CHARGES_TOT ct
     WHERE ds."month" >= ct."EFFECTIVE_DATE"
+  		AND ct."LEASE_END" >= ds."month"
 ),
 FINAL_TO_PIVOT AS (
     SELECT
@@ -101,8 +112,11 @@ FROM
 INNER JOIN "public"."leases" ON fp."LEASE_ID" = "public"."leases"."id"
 INNER JOIN "public"."tenants" ON "public"."tenants"."id" = "public"."leases"."primaryTenantId"
 INNER JOIN "public"."properties" ON fp."PROP_ID" = "public"."properties"."id"
+
+WHERE LOWER(CAST("public"."leases"."month_to_month" AS TEXT)) IN (LOWER(@month_to_month))
+	AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
+
 GROUP BY
     1, 2, 3, 4, 5, 6
 ORDER BY
-    1, 2, 4;
-
+    1, 2, 4
