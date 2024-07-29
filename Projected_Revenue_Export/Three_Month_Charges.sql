@@ -83,11 +83,11 @@ SELECT
 	"public"."tenants"."vendor_id" AS "vendor_id",
 	fp."ITEM_ID" AS "item_id",
 	"public"."properties"."class_id" AS "class_id",
-	SUM(CASE WHEN DATE_TRUNC('month', @AsOfDate + INTERVAL '0 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 1",
+	ROUND(SUM(CASE WHEN DATE_TRUNC('month', @AsOfDate + INTERVAL '0 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END)::numeric, 2) AS "Month 1",
     TO_CHAR(@AsOfDate + INTERVAL '0 month', 'Mon, YY') AS "month_1_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @AsOfDate + INTERVAL '1 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 2",
+    ROUND(SUM(CASE WHEN DATE_TRUNC('month', @AsOfDate + INTERVAL '1 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END)::numeric, 2) AS "Month 2",
     TO_CHAR(@AsOfDate + INTERVAL '1 month', 'Mon, YY') AS "month_2_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @AsOfDate + INTERVAL '2 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 3",
+    ROUND(SUM(CASE WHEN DATE_TRUNC('month', @AsOfDate + INTERVAL '2 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END)::numeric, 2) AS "Month 3",
     TO_CHAR(@AsOfDate + INTERVAL '2 month', 'Mon, YY') AS "month_3_name"
  
 FROM
