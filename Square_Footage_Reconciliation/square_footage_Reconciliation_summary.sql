@@ -3,15 +3,13 @@ WITH SQ_FT_TEMP AS (
 		"public"."properties"."id" AS "PROP_ID",
 		SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT",
   		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
-  		"public"."company_accounts"."company_id" AS "COMPANY_ID",
   		"public"."property_square_footage_items"."value" AS "PROP_SQ_FT",
-  		"public"."property_square_footage_items"."square_footage_type" AS "PROP_SQ_FT_TYPE"
+  		"public"."property_square_footage_items"."square_footage_type" AS "PROP_SQ_FT_TYPE",
+		"public"."properties"."company_relation_id" as "COMPANY_ID"
 	 
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   	INNER JOIN "public"."property_square_footage_items"
   		ON "public"."property_square_footage_items"."property_id" = "public"."properties"."id"
   	INNER JOIN "public"."unit_square_footage_items"
@@ -21,7 +19,7 @@ WITH SQ_FT_TEMP AS (
   		AND "public"."properties"."deleted_at" IS NULL
   		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 		AND "public"."properties"."name" IN (@Property_Name)
-		AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 		AND "public"."unit_square_footage_items"."square_footage_type" IN (@Sqft_Type)
   		AND "public"."property_square_footage_items"."square_footage_type" IN (@Sqft_Type)
   		AND "public"."property_square_footage_items"."as_of_date" <= @AsOfDate
@@ -38,13 +36,11 @@ UNITS AS (
 		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT",
 		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
 		"public"."units"."unit_class" AS "UNIT_CLASS",
-  		"public"."company_accounts"."company_id" AS "COMPANY_ID"
+		"public"."properties"."company_relation_id" as "COMPANY_ID"
   		
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-  	INNER JOIN "public"."company_accounts"
-		ON "public"."properties"."company_relation_id" = "public"."company_accounts"."id"
   	INNER JOIN "public"."unit_square_footage_items"
 		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
 	
@@ -52,7 +48,7 @@ UNITS AS (
   	AND "public"."properties"."deleted_at" IS NULL
   	AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 	AND "public"."properties"."name" IN (@Property_Name)
-	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 	AND "public"."unit_square_footage_items"."square_footage_type" IN (@Sqft_Type)
   	AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
 	
@@ -63,7 +59,7 @@ UNITS AS (
   		"public"."units"."name",
 		"public"."unit_square_footage_items"."square_footage_type",
 		"public"."units"."unit_class",
-  		"public"."company_accounts"."company_id"
+  		"public"."properties"."company_relation_id"
 )
 
 SELECT 	UNITS."PROP_ID",

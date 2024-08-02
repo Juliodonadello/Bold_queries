@@ -6,11 +6,9 @@ with LEASES_TOT AS (
 		  "public"."leases"."name" AS "LEASE_NAME",
 		  "public"."tenants"."name"  as "TENANT",
 		  "public"."properties"."name" AS "PROP_NAME",
-		  "public"."company_accounts"."company_id" AS "COMP_NAME"
+		  "public"."properties"."company_relation_id" AS "COMP_ID"
 
 	FROM "public"."leases"
-	INNER JOIN "public"."company_accounts"
-	  ON "public"."leases"."company_relation_id" = "public"."company_accounts"."id"
   INNER JOIN "public"."leases_units_units"
 	  ON "public"."leases"."id" ="public"."leases_units_units"."leasesId"
   INNER JOIN "public"."tenants"
@@ -22,8 +20,7 @@ with LEASES_TOT AS (
 		  AND ("public"."leases"."end" > @FromDate OR "public"."leases"."end" IS NULL)
 		  AND
 		  ("public"."leases"."deleted_at" is null or "public"."leases"."deleted_at"> @ToDate)
-		  AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
-		  --AND "public"."properties"."name" IN (@Property_Name)  --UNIT_ID 5360
+		  AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 
   ORDER BY "public"."leases_units_units"."unitsId" 
 ),
@@ -66,7 +63,6 @@ FINAL."END" AS "PREVIOUS_LEASE_END",
 "public"."leases"."company_relation_id",
 "public"."leases"."property_id",
 "public"."tenants"."name"  as "TENANT",
-"public"."company_accounts"."company_id",
 "public"."properties"."name" as "PROP_NAME",
 "public"."units"."name" as "UNIT_NAME",
 CASE WHEN FINAL."UNIT_STATUS" IS NULL THEN 'VACANT' ELSE FINAL."UNIT_STATUS" END AS "UNIT_STATUS",
@@ -86,8 +82,6 @@ CASE
 	END AS "Vacancy_years"
 	
 FROM "public"."leases"
-INNER JOIN "public"."company_accounts"
-	ON "public"."leases"."company_relation_id" = "public"."company_accounts"."id"
 INNER JOIN "public"."properties"
 	ON "public"."leases"."property_id" = "public"."properties"."id"
 INNER JOIN "public"."tenants"
@@ -100,12 +94,12 @@ LEFT JOIN FINAL
 	ON FINAL."UNIT_ID" = "public"."units"."id"
 
 where ("public"."leases"."deleted_at" is null or "public"."leases"."deleted_at"> @ToDate)
-	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 	AND "public"."properties"."name" IN (@Property_Name)
 	AND "public"."leases"."move_in" < @ToDate
 	AND "public"."leases"."move_in" >= @FromDate
 
-ORDER BY "public"."company_accounts"."company_id",
+ORDER BY "public"."properties"."company_relation_id",
 "public"."properties"."name",
 "public"."units"."name",
 "public"."tenants"."name"

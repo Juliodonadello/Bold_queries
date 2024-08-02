@@ -7,13 +7,10 @@ select  "public"."leases"."id",
 "public"."leases"."company_relation_id",
 "public"."leases"."property_id",
 "public"."tenants"."name"  as "TENANT",
-"public"."company_accounts"."company_id",
 "public"."properties"."name" as "PROP_NAME",
 "public"."units"."name" as "UNIT_NAME"
 	
 FROM "public"."leases"
-INNER JOIN "public"."company_accounts"
-	ON "public"."leases"."company_relation_id" = "public"."company_accounts"."id"
 INNER JOIN "public"."properties"
 	ON "public"."leases"."property_id" = "public"."properties"."id"
 INNER JOIN "public"."tenants"
@@ -24,12 +21,12 @@ INNER JOIN "public"."units"
 ON "public"."leases_units_units"."unitsId" = "public"."units"."id"
 
 where ("public"."leases"."deleted_at" is null or "public"."leases"."deleted_at"> @ToDate)
-	AND "public"."company_accounts"."company_id" IN (@COMPANY_ID)
+	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 	AND "public"."properties"."name" IN (@Property_Name)
 	AND "public"."leases"."move_in" < @ToDate
 	AND "public"."leases"."move_in" >= @FromDate
 
-ORDER BY "public"."company_accounts"."company_id",
+ORDER BY "public"."properties"."company_relation_id",
 "public"."properties"."name",
 "public"."units"."name",
 "public"."tenants"."name"
