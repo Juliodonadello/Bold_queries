@@ -32,7 +32,8 @@ CHARGES_TOT AS (
         AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
         AND "public"."properties"."name" IN (@Property_Name)
         AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-  		AND "lease_recurring_charge_amounts"."effective_date" <= "public"."leases"."end"
+  		AND ("lease_recurring_charge_amounts"."effective_date" <= "public"."leases"."end"
+			OR "public"."leases"."end" is NULL)
 ),
 charged_amounts AS (
     SELECT
