@@ -19,7 +19,8 @@ CHARGES_TOT AS (
   		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 0 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "OTHER_CHARGE",
   		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
   		"public"."units"."property_id" "PROP_ID",
-  		"public"."lease_recurring_charges"."unit_id" "UNIT_ID"
+  		"public"."lease_recurring_charges"."unit_id" "UNIT_ID",
+		"public"."lease_recurring_charge_amounts"."frequency" "FREQUENCY"
   
 	FROM "public"."lease_recurring_charges"
 	LEFT OUTER JOIN "public"."lease_recurring_charge_amounts"
@@ -62,7 +63,8 @@ CHARGES_TOT AS (
 		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 0 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END,
 		"public"."lease_recurring_charge_amounts"."effective_date",
 		"public"."units"."property_id",
-		"public"."lease_recurring_charges"."unit_id"
+		"public"."lease_recurring_charges"."unit_id",
+		"public"."lease_recurring_charge_amounts"."frequency"
 	),
 MAX_CHARGES AS (
  	SELECT  "RCHARGE_ID" "RCHARGE_ID",
@@ -83,7 +85,8 @@ CHARGES AS (
   CHARGES_TOT."OTHER_CHARGE",
   CHARGES_TOT."EFFECTIVE_DATE",
   CHARGES_TOT."PROP_ID",
-  CHARGES_TOT."UNIT_ID"
+  CHARGES_TOT."UNIT_ID",
+  CHARGES_TOT."FREQUENCY"
 	),
 LEASES AS (
   SELECT "public"."leases"."id" AS "LEASE_ID",
@@ -138,7 +141,9 @@ LEASES_CHARGES AS (
   	COALESCE(MAX(CASE WHEN LEASES."DEPOSIT" = 'YES' THEN 'YES' END), MAX(LEASES."DEPOSIT")) AS "DEPOSIT",
   	COALESCE(MAX(CASE WHEN LEASES."REFUNDABLE" = 'YES' THEN 'YES' END), MAX(LEASES."REFUNDABLE")) AS "REFUNDABLE",
   	SUM(CHARGES."RENT_CHARGE") "RENT_CHARGE",
-  	SUM(CHARGES."OTHER_CHARGE") "OTHER_CHARGE"
+  	SUM(CHARGES."OTHER_CHARGE") "OTHER_CHARGE",
+	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN 1 ELSE 0 END) as "annually_count",
+	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Monthly' THEN 1 ELSE 0 END) as "monthly_count"
 		
 	FROM LEASES
 	LEFT JOIN CHARGES
@@ -146,7 +151,7 @@ LEASES_CHARGES AS (
   		AND LEASES."UNIT_ID" = CHARGES."UNIT_ID"
 	GROUP BY LEASES."LEASE_ID",
 		LEASES."UNIT_ID",
-		LEASES."TENANT" 
+		LEASES."TENANT"
 	),
 SQ_FT_TEMP AS (
 	SELECT
@@ -197,7 +202,9 @@ FINAL AS (
 		"DEPOSIT",
 		"REFUNDABLE",
 		"RENT_CHARGE",
-		"OTHER_CHARGE"
+		"OTHER_CHARGE",
+		max("annually_count") "annually_count",
+		max("monthly_count") "monthly_count"
 	from LEASES_CHARGES
 	group by 
 		"LEASE_ID",
@@ -245,6 +252,12 @@ FINAL."DEPOSIT",
 FINAL."REFUNDABLE",
 FINAL."RENT_CHARGE" "RENT_AMOUNT",
 FINAL."OTHER_CHARGE" "OTHER_AMOUNT",
+CASE 	WHEN FINAL."monthly_count" < 1 AND FINAL."annually_count" >= 1 then FINAL."RENT_CHARGE" 
+		ELSE FINAL."RENT_CHARGE" * 12 
+	END AS "ANNUAL_RENT_AMOUNT",
+CASE 	WHEN FINAL."monthly_count" < 1 AND FINAL."annually_count" >= 1 then FINAL."OTHER_CHARGE" 
+		ELSE FINAL."OTHER_CHARGE" * 12 
+	END AS "ANNUAL_OTHER_AMOUNT",
 CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."RENT_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Rent/Sq Ft",
 CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."OTHER_CHARGE" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Other/Sq Ft"
 
