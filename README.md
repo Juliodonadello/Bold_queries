@@ -17,8 +17,14 @@ report-repo/
 │   └── customization-client-name/
 │       └── queries
 │ 
-└── parameters/
-    └── user-common-filtering-queries
+├── parameters/
+│   └── user-common-filtering-queries
+│ 
+└── Bold_DW/
+    ├── param
+    │   └── queries
+    └── ds/
+        └── queries
 ```
 
 # Overview

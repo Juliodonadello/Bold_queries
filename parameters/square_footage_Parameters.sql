@@ -16,6 +16,7 @@ WITH UNITS AS
 	
   	WHERE "public"."units"."deleted_at" IS NULL
   	and "public"."properties"."deleted_at" IS NULL
+	AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
   
 	GROUP BY 
 		"public"."properties"."id",
