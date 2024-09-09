@@ -3,13 +3,15 @@ WITH CHARGES_TOT AS (
 		"public"."units"."property_id" AS "PROP_ID",
   		"public"."properties"."name" AS "PROP_NAME",
   		"public"."units"."name" AS "UNIT_NAME",
+		"public"."units"."total_square_footage" AS "UNIT_SQ_FT",
   		"public"."lease_recurring_charges"."unit_id" AS "UNIT_ID",
  		"public"."lease_recurring_charges"."lease_id" AS "LEASE_ID",
   		"public"."lease_recurring_charges"."id" AS "RCHARGE_ID",
   		"public"."lease_recurring_charges"."order_entry_item_id" AS "ITEM_ID" ,
   		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
   		"public"."lease_recurring_charge_amounts"."amount" AS "AMOUNT",
-  		"public"."lease_recurring_charge_amounts"."frequency" AS "FREQUENCY"
+  		"public"."lease_recurring_charge_amounts"."frequency" AS "FREQUENCY",
+  		"public"."lease_recurring_charge_amounts"."amount"/COALESCE("public"."units"."total_square_footage", 100000) AS "Am/SqFt"
   
 	FROM "public"."lease_recurring_charges"
 	INNER JOIN "public"."lease_recurring_charge_amounts"
@@ -18,9 +20,12 @@ WITH CHARGES_TOT AS (
   		ON "public"."lease_recurring_charges"."unit_id" =  "public"."units"."id"
  	INNER JOIN "public"."properties"
   		ON "public"."properties"."id" =  "public"."units"."property_id"
+  	INNER JOIN "public"."leases"
+  		ON "public"."leases"."id"  = "public"."lease_recurring_charges"."lease_id" 
   
   	WHERE --"public"."lease_recurring_charge_amounts"."effective_date" <= @AsOfDate 
   	"public"."properties"."name" IN (@Property_Name)
+	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
   	AND
 	 (
 		"public"."lease_recurring_charge_amounts"."deleted_at" >= @AsOfDate 
@@ -46,6 +51,12 @@ WITH CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."deleted_at" IS NULL
 		)
+  	AND "public"."leases"."start" <= @AsOfDate 
+	AND (
+		"public"."leases"."end" >= @AsOfDate
+		OR
+		"public"."leases"."end" IS NULL
+		)
 ),
 MAX_CHARGES AS (
  	SELECT  "RCHARGE_ID" "RCHARGE_ID",
@@ -60,7 +71,7 @@ CHARGES AS (
    CASE 	WHEN MAX_CHARGES."STATUS" IS NULL AND CHARGES_TOT."EFFECTIVE_DATE" >= @AsOfDate  THEN 'Future'
 			  WHEN MAX_CHARGES."STATUS" IS NULL AND CHARGES_TOT."EFFECTIVE_DATE" < @AsOfDate THEN 'Historical'
 			  ELSE MAX_CHARGES."STATUS"
-	  END AS "STATUS"
+	  END AS "RCHARGE_STATUS"
 
    from CHARGES_TOT
    LEFT JOIN MAX_CHARGES 
@@ -70,6 +81,8 @@ CHARGES AS (
   ORDER BY CHARGES_TOT."RCHARGE_ID", CHARGES_TOT."EFFECTIVE_DATE" ASC
  )
  
- armar otro dataset con granularidad lease para traer info de latre charges, deposits, options, notes
- y mostrar estos datos un multiples tablas dentro de una lista agrupada por lease (layout del reporte).
+ SELECT * 
+ FROM CHARGES
+ WHERE CHARGES."LEASE_ID" IS NOT NULL
  
+VER FILE TODO.TXT
