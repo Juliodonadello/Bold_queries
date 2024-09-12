@@ -7,8 +7,7 @@ SELECT "public"."leases"."id",
 "public"."leases"."intended_move_out",
 "public"."leases"."actual_move_out",
 "public"."tenants"."name" AS "tenants_name",
-"public"."tenants"."email",
-"public"."tenants"."balance" 
+"public"."tenants"."email" 
 
 FROM "public"."leases" 
 INNER JOIN "public"."tenants"
