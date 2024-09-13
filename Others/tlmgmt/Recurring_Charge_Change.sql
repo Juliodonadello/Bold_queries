@@ -22,7 +22,7 @@ with CHARGES_TOT AS (
   		AND "lease_recurring_charge_amounts"."effective_date" >= @From_Date
         AND ("lease_recurring_charge_amounts"."deleted_at" >= @To_Date OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
         AND ("lease_recurring_charges"."deleted_at" >= @To_Date OR "lease_recurring_charges"."deleted_at" IS NULL)
-        AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
+        --AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
         AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
         AND "public"."properties"."name" IN (@Property_Name)
         AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)

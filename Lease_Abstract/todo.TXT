@@ -1,1 +1,0 @@
-meter lease late charges .sql dentro del lease abstract.sql
