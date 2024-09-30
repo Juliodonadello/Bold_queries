@@ -51,7 +51,7 @@ WITH CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."deleted_at" IS NULL
 		)
-  	AND "public"."leases"."start" <= @AsOfDate 
+  	--AND "public"."leases"."start" <= @AsOfDate 
 	AND (
 		"public"."leases"."end" >= @AsOfDate
 		OR

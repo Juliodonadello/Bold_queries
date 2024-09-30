@@ -17,7 +17,7 @@ WITH DEPOSITS AS (
   WHERE
 	"public"."properties"."name" IN (@Property_Name)
 	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
-	AND "public"."lease_deposits"."created_at" <= @AsOfDate 
+	--AND "public"."lease_deposits"."created_at" <= @AsOfDate 
 	AND (
 	  "public"."lease_deposits"."deleted_at" >= @AsOfDate
 	  OR

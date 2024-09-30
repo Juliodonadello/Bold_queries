@@ -18,7 +18,7 @@ INNER JOIN "public"."properties"
   WHERE
 	"public"."properties"."name" IN (@Property_Name)
 	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
-	AND "public"."lease_options"."created_at" <= @AsOfDate 
+	--AND "public"."lease_options"."created_at" <= @AsOfDate 
 	AND (
 	  "public"."lease_options"."deleted_at" >= @AsOfDate
 	  OR
