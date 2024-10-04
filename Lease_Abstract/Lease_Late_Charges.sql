@@ -4,7 +4,8 @@ WITH LEATE_CHARGES AS (
   "public"."lease_late_charges"."minimum_lease_balance",
   "public"."lease_late_charges"."suppress_charge_under",
   "public"."lease_late_charges"."lease_id",
-  "public"."lease_late_charges"."process_by"
+  CAST("public"."lease_late_charges"."process_by" AS text) "process_by"
+  
 
   FROM "public"."lease_late_charges"
 	INNER JOIN "public"."leases"
@@ -14,7 +15,7 @@ WITH LEATE_CHARGES AS (
 
   where  CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 	  AND "public"."properties"."name" IN (@Property_Name)
-	  AND "public"."lease_late_charges"."created_at" <= @AsOfDate
+	  --AND "public"."lease_late_charges"."created_at" <= @AsOfDate
 	  AND
 	  (
 		"public"."lease_late_charges"."deleted_at" >= @AsOfDate
@@ -34,8 +35,7 @@ LEATE_CHARGES_STEPS AS (
 
   FROM "public"."lease_late_charge_steps" 
 
-  WHERE "public"."lease_late_charge_steps"."created_at" <= @AsOfDate
-	  AND
+  WHERE --"public"."lease_late_charge_steps"."created_at" <= @AsOfDate	  AND
 	  (
 		"public"."lease_late_charge_steps"."deleted_at" >= @AsOfDate
 		OR

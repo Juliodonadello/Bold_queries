@@ -162,7 +162,7 @@ UNITS AS (
 		"public"."properties"."name" AS "PROP_NAME",
 		"public"."units"."id" AS "UNIT_ID",
   		"public"."units"."name" AS "UNIT_NAME",
-		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT",
+		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT", ## TO CHANGE ###
 		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
 		"public"."units"."unit_class" AS "UNIT_CLASS"
   		

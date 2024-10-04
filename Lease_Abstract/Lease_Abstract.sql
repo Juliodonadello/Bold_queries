@@ -11,7 +11,19 @@ WITH CHARGES_TOT AS (
   		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
   		"public"."lease_recurring_charge_amounts"."amount" AS "AMOUNT",
   		"public"."lease_recurring_charge_amounts"."frequency" AS "FREQUENCY",
-  		"public"."lease_recurring_charge_amounts"."amount"/COALESCE("public"."units"."total_square_footage", 100000) AS "Am/SqFt"
+  		CASE	WHEN CAST("public"."units"."total_square_footage" AS INT) = 0 THEN 0 
+  					WHEN "public"."units"."total_square_footage" IS NULL THEN 0 				
+  					ELSE "public"."lease_recurring_charge_amounts"."amount"/"public"."units"."total_square_footage" 
+  		END AS "Am/SqFt",
+  		CASE 	WHEN "public"."leases"."month_to_month" = 'False' THEN 'NO'
+					WHEN "public"."leases"."month_to_month" = 'True' THEN 'YES'
+		END AS "M_t_M",
+  		CASE WHEN "public"."leases"."status" = 'current' THEN 'Current'
+		  WHEN "public"."leases"."status" = 'canceled' THEN 'Canceled'
+		  WHEN "public"."leases"."status" = 'terminated' THEN 'Terminated'
+		  WHEN "public"."leases"."status" = 'future' THEN 'Future'
+		  ELSE 'null' 
+END AS "LEASE_STATUS"
   
 	FROM "public"."lease_recurring_charges"
 	INNER JOIN "public"."lease_recurring_charge_amounts"
@@ -26,6 +38,14 @@ WITH CHARGES_TOT AS (
   	WHERE --"public"."lease_recurring_charge_amounts"."effective_date" <= @AsOfDate 
   	"public"."properties"."name" IN (@Property_Name)
 	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
+  	AND CASE 
+  					WHEN "public"."leases"."status" = 'current' THEN 'Current'
+					WHEN "public"."leases"."status" = 'canceled' THEN 'Canceled'
+					WHEN "public"."leases"."status" = 'terminated' THEN 'Terminated'
+					WHEN "public"."leases"."status" = 'future' THEN 'Future'
+					ELSE 'null' 
+			END  IN (@Lease_Status)
+  	AND "public"."leases"."name" IN (@Lease_Name)
   	AND
 	 (
 		"public"."lease_recurring_charge_amounts"."deleted_at" >= @AsOfDate 
@@ -77,10 +97,12 @@ CHARGES AS (
    LEFT JOIN MAX_CHARGES 
 	  ON CHARGES_TOT."RCHARGE_ID" =  MAX_CHARGES."RCHARGE_ID" 
 	  AND CHARGES_TOT."EFFECTIVE_DATE" =  MAX_CHARGES."EFFECTIVE_DATE"
-
+	
+  WHERE CHARGES_TOT."M_t_M" IN (@month_to_month)
   ORDER BY CHARGES_TOT."RCHARGE_ID", CHARGES_TOT."EFFECTIVE_DATE" ASC
  )
  
  SELECT * 
  FROM CHARGES
  WHERE CHARGES."LEASE_ID" IS NOT NULL
+ 
