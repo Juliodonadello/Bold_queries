@@ -144,11 +144,18 @@ LEASES_CHARGES AS (
 SQ_FT_TEMP AS (
 	SELECT
 		"public"."properties"."id" AS "PROP_ID",
-		SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT"
-	 
+		--SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT"
+  		SUM (CASE WHEN "public"."unit_square_footage_items"."value" IS NULL THEN "public"."units"."total_square_footage"
+							ELSE "public"."unit_square_footage_items"."value"
+				END) AS "TOT_SQ_FT"
+  
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
+  	LEFT JOIN "public"."unit_square_footage_items"
+		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
+  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
+  		AND "public"."unit_square_footage_items"."square_footage_type" = 'Total'
 		
 	WHERE "public"."units"."deleted_at" IS NULL
   		AND "public"."properties"."deleted_at" IS NULL
@@ -162,28 +169,26 @@ UNITS AS (
 		"public"."properties"."name" AS "PROP_NAME",
 		"public"."units"."id" AS "UNIT_ID",
   		"public"."units"."name" AS "UNIT_NAME",
-		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT", ## TO CHANGE ###
 		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
-		"public"."units"."unit_class" AS "UNIT_CLASS"
+  		"public"."unit_square_footage_items"."value" AS "EFF_UNIT_SQ_FT",
+		"public"."units"."unit_class" AS "UNIT_CLASS",
+  		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT"
   		
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
 	LEFT JOIN "public"."unit_square_footage_items"
 		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
+  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
+  		AND "public"."unit_square_footage_items"."square_footage_type" = 'Total'
   	
   	WHERE "public"."properties"."deleted_at" IS NULL
 		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-	
+  		
 	GROUP BY 
-		"public"."properties"."id",
-		"public"."properties"."name",
-		"public"."units"."id",
-  		"public"."units"."name",
-		"public"."unit_square_footage_items"."square_footage_type",
-		"public"."units"."unit_class"
-	),
+		1,2,3,4,5,6,7
+),
 FINAL AS (
 	select 
 		"LEASE_ID",
@@ -233,7 +238,9 @@ FINAL."TENANT",
 FINAL."lease_created_at" "lease_created_at",
 FINAL."start" "lease_start",
 FINAL."lease_end",	
-UNITS."UNIT_SQ_FT" "UNIT_SQ_FT",
+CASE 	WHEN UNITS."EFF_UNIT_SQ_FT" IS NULL THEN UNITS."UNIT_SQ_FT" 
+			ELSE UNITS."EFF_UNIT_SQ_FT"
+END AS "UNIT_SQ_FT",
 CASE WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN  UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" ELSE UNITS."UNIT_SQ_FT" END AS  "UNIT_SQ_FT_fix",
 
 CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN UNITS."UNIT_SQ_FT" ELSE NULL END AS  "OCCUPIED_UNIT_SQ_FT",
@@ -298,7 +305,7 @@ INNER JOIN "public"."properties"
 		ON UNITS."PROP_ID" = "public"."properties"."id"
 		
 where  	UNITS."PROP_NAME" IN (@Property_Name)
-		AND UNITS."SQ_FT_TYPE" IN (@Sqft_Type)
+		--AND UNITS."SQ_FT_TYPE" IN (@Sqft_Type)
 		AND UNITS."UNIT_CLASS" IN (@Unit_Class)
 		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 
