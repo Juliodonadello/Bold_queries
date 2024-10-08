@@ -20,7 +20,7 @@ CHARGES_TOT AS (
   		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
   		"public"."units"."property_id" "PROP_ID",
   		"public"."lease_recurring_charges"."unit_id" "UNIT_ID",
-		"public"."lease_recurring_charge_amounts"."frequency" "FREQUENCY"
+  		"public"."lease_recurring_charge_amounts"."frequency" "FREQUENCY"
   
 	FROM "public"."lease_recurring_charges"
 	LEFT OUTER JOIN "public"."lease_recurring_charge_amounts"
@@ -56,7 +56,7 @@ CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."terminate_date" is NULL 
 		)
-		
+	
 	GROUP BY 
 		"public"."lease_recurring_charges"."lease_id",
 		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END ,
@@ -140,7 +140,7 @@ LEASES_CHARGES AS (
   	COALESCE(MAX(CASE WHEN LEASES."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' END), MAX(LEASES."LEASE_STATUS")) AS "LEASE_STATUS",
   	COALESCE(MAX(CASE WHEN LEASES."DEPOSIT" = 'YES' THEN 'YES' END), MAX(LEASES."DEPOSIT")) AS "DEPOSIT",
   	COALESCE(MAX(CASE WHEN LEASES."REFUNDABLE" = 'YES' THEN 'YES' END), MAX(LEASES."REFUNDABLE")) AS "REFUNDABLE",
-  	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."RENT_CHARGE" / 12 ELSE CHARGES."RENT_CHARGE" END) AS "RENT_AMOUNT",
+	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."RENT_CHARGE" / 12 ELSE CHARGES."RENT_CHARGE" END) AS "RENT_AMOUNT",
   	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."OTHER_CHARGE" / 12 ELSE CHARGES."OTHER_CHARGE" END) AS "OTHER_AMOUNT",
 	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."RENT_CHARGE" ELSE CHARGES."RENT_CHARGE" * 12 END) AS "ANNUAL_RENT_AMOUNT",
   	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."OTHER_CHARGE" ELSE CHARGES."OTHER_CHARGE" * 12 END) AS "ANNUAL_OTHER_AMOUNT"
@@ -151,19 +151,25 @@ LEASES_CHARGES AS (
   		AND LEASES."UNIT_ID" = CHARGES."UNIT_ID"
 	GROUP BY LEASES."LEASE_ID",
 		LEASES."UNIT_ID",
-		LEASES."TENANT"
+		LEASES."TENANT" 
 	),
 SQ_FT_TEMP AS (
 	SELECT
 		"public"."properties"."id" AS "PROP_ID",
-		SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT"
+		--SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT",}
+		SUM(COALESCE("public"."unit_square_footage_items"."value", "public"."units"."total_square_footage")) AS "TOT_SQ_FT"
 	 
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
+	LEFT JOIN "public"."unit_square_footage_items"
+		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
+  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
+  		AND "public"."unit_square_footage_items"."square_footage_type" = 'Total'
   
-  	WHERE "public"."units"."deleted_at" IS NULL
-  		AND "public"."properties"."deleted_at" IS NULL
+  	WHERE "public"."properties"."deleted_at" IS NULL
+		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+		AND "public"."properties"."name" IN (@Property_Name)
 		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 		
 	GROUP BY  "public"."properties"."id" 
@@ -174,15 +180,21 @@ UNITS AS (
 		"public"."properties"."name" AS "PROP_NAME",
 		"public"."units"."id" AS "UNIT_ID",
   		"public"."units"."name" AS "UNIT_NAME",
-		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT"
-  		
+		--MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT"
+		MAX(COALESCE("public"."unit_square_footage_items"."value", "public"."units"."total_square_footage")) AS "UNIT_SQ_FT"
+
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-	
+	LEFT JOIN "public"."unit_square_footage_items"
+		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
+  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
+  		AND "public"."unit_square_footage_items"."square_footage_type" = 'Total'
+  
   	WHERE "public"."properties"."deleted_at" IS NULL
-		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+		AND "public"."properties"."name" IN (@Property_Name)
+		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 	
 	GROUP BY 
 		"public"."properties"."id",
@@ -223,42 +235,28 @@ FINAL AS (
 	ORDER BY LEASES_CHARGES."LEASE_ID"
 	),
 FINAL_AUX AS (
+    -- prop SQ FT fix when having 2 or more leases for the same unit
+    -- we dont want to sum twice the unit sq ft
     SELECT COUNT(DISTINCT "LEASE_ID") "LEASES_COUNT",
     "UNIT_ID"
     FROM FINAL
     GROUP BY "UNIT_ID"
 	)
 
-SELECT 
-UNITS."PROP_ID",
-UNITS."PROP_NAME",
-UNITS."UNIT_ID",
-UNITS."UNIT_NAME" "UNIT_NAME" ,
-FINAL."LEASE_ID",
-CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS", 
-FINAL."TENANT",
-FINAL."lease_created_at" "lease_created_at",
-FINAL."start" "lease_start",
-FINAL."lease_end",	
-UNITS."UNIT_SQ_FT" "UNIT_SQ_FT",
-CASE 	WHEN (FINAL_AUX."LEASES_COUNT" = 0 OR FINAL_AUX."LEASES_COUNT" IS NULL) THEN UNITS."UNIT_SQ_FT" 
-		ELSE UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
-	END AS "UNIT_SQ_FT_fix",
-CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 
-		ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
-	END AS "Pct of Property",
-CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 
-		ELSE ("UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") / SQ_FT_TEMP."TOT_SQ_FT" * 100 
-	END AS "Pct of Property_fix",
-FINAL."DEPOSIT",
-FINAL."REFUNDABLE",
-FINAL."RENT_AMOUNT" "RENT_AMOUNT",
-FINAL."OTHER_AMOUNT" "OTHER_AMOUNT",
-FINAL."ANNUAL_RENT_AMOUNT" "ANNUAL_RENT_AMOUNT",
-FINAL."ANNUAL_OTHER_AMOUNT" "ANNUAL_OTHER_AMOUNT",
-CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."RENT_AMOUNT" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Rent/Sq Ft",
-CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE FINAL."OTHER_AMOUNT" *12 /UNITS."UNIT_SQ_FT" END AS "Annual Other/Sq Ft"
 
+SELECT 
+	UNITS."PROP_ID",
+	UNITS."PROP_NAME",
+	COUNT(DISTINCT UNITS."UNIT_ID") AS "UNIT_TOT",
+	SUM(CASE
+	  		WHEN (FINAL_AUX."LEASES_COUNT" = 0 OR FINAL_AUX."LEASES_COUNT" IS NULL) THEN UNITS."UNIT_SQ_FT" 
+	  		ELSE UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT"
+	  	END ) AS "PROP_SQ_FT",
+	--SUM(UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") AS  "PROP_SQ_FT",
+	SUM(CASE WHEN (FINAL."LEASE_STATUS"='OCCUPIED') THEN UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" ELSE 0 END) AS "OCCUPIED_UNIT_SQ_FT",
+	SUM(FINAL."RENT_AMOUNT") "RENT_AMOUNT_TOT",
+	SUM(FINAL."OTHER_AMOUNT") "OTHER_AMOUNT_TOT"
+	
 FROM UNITS
 LEFT JOIN SQ_FT_TEMP
 	ON UNITS."PROP_ID" = SQ_FT_TEMP."PROP_ID"
@@ -268,8 +266,10 @@ LEFT JOIN FINAL_AUX
 	ON FINAL."UNIT_ID" = FINAL_AUX."UNIT_ID"
 INNER JOIN "public"."properties"
 		ON UNITS."PROP_ID" = "public"."properties"."id"
-		
-where  "PROP_NAME" IN (@Property_Name)
-	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 
-order by "PROP_NAME", UNITS."UNIT_NAME"
+where  "PROP_NAME" IN (@Property_Name)
+ and "public"."properties"."deleted_at" IS NULL
+ AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
+
+group by UNITS."PROP_ID",UNITS."PROP_NAME","public"."properties"."company_relation_id" 
+order by "PROP_NAME"

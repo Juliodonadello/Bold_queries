@@ -1,7 +1,7 @@
 WITH SQ_FT_TEMP AS (
 	SELECT
 		"public"."properties"."id" AS "PROP_ID",
-		--SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT",}
+		--SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT",
 		SUM("public"."unit_square_footage_items"."value") AS "TOT_SQ_FT",
   		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
   		"public"."property_square_footage_items"."value" AS "PROP_SQ_FT",
@@ -23,8 +23,6 @@ WITH SQ_FT_TEMP AS (
   		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 		AND "public"."properties"."name" IN (@Property_Name)
 		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
-  		AND "public"."property_square_footage_items"."as_of_date" <= @AsOfDate
-		AND "public"."property_square_footage_items"."square_footage_type" IN (@Sqft_Type)
 		
 	GROUP BY  1,3,4,5,6
   		

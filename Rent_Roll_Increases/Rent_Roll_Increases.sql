@@ -168,15 +168,21 @@ LEASES_CHARGES AS (
 SQ_FT_TEMP AS (
 	SELECT
 		"public"."properties"."id" AS "PROP_ID",
-		SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT"
+		--SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT",}
+		SUM(COALESCE("public"."unit_square_footage_items"."value", "public"."units"."total_square_footage")) AS "TOT_SQ_FT"
 	 
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
-	
-  	WHERE "public"."units"."deleted_at" IS NULL
-  		AND "public"."properties"."deleted_at" IS NULL
-		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+	LEFT JOIN "public"."unit_square_footage_items"
+		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
+  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
+  		AND "public"."unit_square_footage_items"."square_footage_type" = 'Total'
+		
+  	WHERE "public"."properties"."deleted_at" IS NULL
+		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+		AND "public"."properties"."name" IN (@Property_Name)
+		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 		
 	GROUP BY  "public"."properties"."id"
 	),
@@ -186,15 +192,21 @@ UNITS AS (
 		"public"."properties"."name" AS "PROP_NAME",
 		"public"."units"."id" AS "UNIT_ID",
   		"public"."units"."name" AS "UNIT_NAME",
-		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT"
+		--MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT"
+		MAX(COALESCE("public"."unit_square_footage_items"."value", "public"."units"."total_square_footage")) AS "UNIT_SQ_FT"
   		
 	FROM   "public"."units"
 	INNER JOIN "public"."properties"
 		ON "public"."units"."property_id" = "public"."properties"."id"
+	LEFT JOIN "public"."unit_square_footage_items"
+		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
+  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
+  		AND "public"."unit_square_footage_items"."square_footage_type" = 'Total'
 
   	WHERE "public"."properties"."deleted_at" IS NULL
-		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+		AND "public"."properties"."name" IN (@Property_Name)
+		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 	
 	GROUP BY 
 		"public"."properties"."id",
