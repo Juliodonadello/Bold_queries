@@ -114,8 +114,8 @@ INNER JOIN "public"."leases" ON fp."LEASE_ID" = "public"."leases"."id"
 INNER JOIN "public"."tenants" ON "public"."tenants"."id" = "public"."leases"."primaryTenantId"
 INNER JOIN "public"."properties" ON fp."PROP_ID" = "public"."properties"."id"
 
-WHERE LOWER(CAST("public"."leases"."month_to_month" AS TEXT)) IN (LOWER(@month_to_month))
-	AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
+WHERE CASE WHEN CAST("public"."leases"."month_to_month" AS TEXT) ='true' THEN 'True' ELSE 'False' END IN (@month_to_month)      
+    AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
 
 GROUP BY
     1, 2, 3, 4, 5, 6
