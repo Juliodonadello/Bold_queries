@@ -19,7 +19,6 @@
    **Filter:**
    - Effective date of charge amounts must be on or before `@AsOfDate`.
    - Charge amounts must not be deleted before `@AsOfDate`.
-   - Charges must not be deleted before `@AsOfDate`.
    - Frequency should not be 'One Time', or if it is, it should have an effective date within the last 30 days.
    - Termination date of charges must be on or after `@AsOfDate` or be NULL.
 
@@ -78,7 +77,16 @@
    - Units must be active (not deleted before `@AsOfDate`).
    - Company relation ID must match `@REAL_COMPANY_ID`.
 
-9. **FINAL**
+9. **RENT_SCALATIONS**
+
+   **Purpose:**
+   - Manages and counts rental scalation events for leases, ensuring accurate rent escalation tracking.
+
+   **Filter:**
+   - Includes all lease escalations where lease dates fall within the specified reporting period.
+   - Counts the number of rent scalations for each lease, assigning a default value of 1 when no scalations are present.
+
+10. **FINAL**
 
    **Purpose:**
    - Aggregates and summarizes lease and charge data, ensuring correct grouping and calculation.
@@ -86,7 +94,7 @@
    **Filter:**
    - Groups by all relevant columns from `LEASES_CHARGES`.
 
-10. **FINAL_AUX**
+11. **FINAL_AUX**
 
     **Purpose:**
     - Counts the number of leases per unit to adjust square footage calculations.
@@ -107,3 +115,7 @@ The final `SELECT` statement joins all previous CTEs and performs calculations t
 - Lease ID and Status
 - Tenant Name
 - Lease Dates and Square Footage
+- Charges and Annualized Amounts 
+
+**Notes**:
+- If a lease only has annual charges, the annualized amount is equal to the monthly charge amount displayed. If there is at least one monthly amount, then an x12 calculation is displayed in the annualized amount.

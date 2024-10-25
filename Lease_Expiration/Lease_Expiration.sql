@@ -40,6 +40,6 @@ INNER JOIN SQ_FT_TEMP ON "public"."properties"."id" = SQ_FT_TEMP."PROP_ID"
 
 WHERE  "public"."leases"."end" IS NOT NULL
     AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-    AND "public"."properties"."name" IN (@Property_Name)
     --AND "public"."leases"."status" IN (@Lease_Status) --Reatrieving operator error. Fix: Implementing a filter over the table layout using the parameter values
 	-- and "public"."leases"."end" between '2024-11-30' and '2024-11-30' -- Date is added as a parameter in the table
+	AND "public"."properties"."name" IN (@Property_Name)
