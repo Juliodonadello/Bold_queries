@@ -13,7 +13,8 @@ CHARGES_TOT AS (
         "lease_recurring_charges"."order_entry_item_id" AS "ITEM_ID",
         "units"."property_id" AS "PROP_ID",
         "lease_recurring_charges"."unit_id" AS "UNIT_ID",
-  		"public"."leases"."end" AS "LEASE_END"
+  		"public"."leases"."end" AS "LEASE_END",
+  		"lease_recurring_charge_amounts"."frequency" AS "FREQUENCY"
   
     FROM "public"."lease_recurring_charges"
     INNER JOIN "public"."lease_recurring_charge_amounts"
@@ -28,7 +29,7 @@ CHARGES_TOT AS (
     WHERE "lease_recurring_charge_amounts"."effective_date" <= @To_Date
         AND ("lease_recurring_charge_amounts"."deleted_at" >= @To_Date OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
         AND ("lease_recurring_charges"."deleted_at" >= @To_Date OR "lease_recurring_charges"."deleted_at" IS NULL)
-        AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
+        --AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
         AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
         AND "public"."properties"."name" IN (@Property_Name)
         AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
@@ -41,9 +42,11 @@ charged_amounts AS (
         ct."LEASE_ID",
         ct."EFFECTIVE_DATE",
         ct."AMOUNT" AS "AMOUNT_OLD",
-  		CASE WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
+  		CASE
+            WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12
+            WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
 				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")  ) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 30
-  				ELSE ct."AMOUNT" 
+  			ELSE ct."AMOUNT" 
   		END AS "AMOUNT",
         ct."ITEM_ID",
         ct."PROP_ID",
