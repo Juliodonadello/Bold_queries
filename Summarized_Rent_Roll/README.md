@@ -72,6 +72,7 @@
 
    **Purpose:**
    - Retrieves details and square footage of units, filtering for active units.
+   - Only use the "Total" sq ft type.
 
    **Filter:**
    - Properties must not be deleted.
