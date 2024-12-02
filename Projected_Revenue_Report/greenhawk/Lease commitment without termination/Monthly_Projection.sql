@@ -14,7 +14,9 @@ CHARGES_TOT AS (
         "units"."property_id" AS "PROP_ID",
         "lease_recurring_charges"."unit_id" AS "UNIT_ID",
         "public"."leases"."end" AS "LEASE_END",
-        "lease_recurring_charge_amounts"."frequency" AS "FREQUENCY"
+        "lease_recurring_charge_amounts"."frequency" AS "FREQUENCY", 
+  		"lease_recurring_charges"."terminate_date" AS "RCHARGE_END"
+
     FROM "public"."lease_recurring_charges"
     INNER JOIN "public"."lease_recurring_charge_amounts"
         ON "lease_recurring_charges"."id" = "lease_recurring_charge_amounts"."recurring_charge_id"
@@ -48,6 +50,7 @@ charged_amounts AS (
     FROM date_series ds
     CROSS JOIN CHARGES_TOT ct
     WHERE ds."month" >= ct."EFFECTIVE_DATE"
+        AND (ct."RCHARGE_END" >= ds."month" or ct."RCHARGE_END" is NULL)
 ),
 filled_amounts AS (
     SELECT

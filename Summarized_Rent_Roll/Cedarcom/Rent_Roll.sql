@@ -57,12 +57,11 @@ CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."terminate_date" is NULL 
 		)
-	AND (	
+  AND (	
 	  	"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
 		OR
 		"public"."lease_recurring_charges"."deleted_at" is NULL 
 		)
-
 	GROUP BY 
 		"public"."lease_recurring_charges"."lease_id",
 		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END ,
@@ -106,7 +105,8 @@ LEASES AS (
 			WHEN MAX(CASE WHEN "public"."lease_deposits"."refundable" = 'true' THEN 1 ELSE 0 END) = 1 THEN 'YES'
 			ELSE 'NO'
 		END AS "REFUNDABLE",
-		"public"."tenants"."name"  as "TENANT"
+		"public"."tenants"."name"  as "TENANT",
+		"public"."leases"."month_to_month" AS "M_T_M"
   
   FROM "public"."leases"
 	INNER JOIN "public"."leases_units_units"
@@ -131,7 +131,8 @@ LEASES AS (
 		"public"."leases"."status",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END ,
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END ,
-		"public"."tenants"."name"
+		"public"."tenants"."name",
+  		"public"."leases"."month_to_month"
 	),
 LEASES_CHARGES AS (
 	SELECT 
@@ -146,7 +147,8 @@ LEASES_CHARGES AS (
   	COALESCE(MAX(CASE WHEN LEASES."DEPOSIT" = 'YES' THEN 'YES' END), MAX(LEASES."DEPOSIT")) AS "DEPOSIT",
   	COALESCE(MAX(CASE WHEN LEASES."REFUNDABLE" = 'YES' THEN 'YES' END), MAX(LEASES."REFUNDABLE")) AS "REFUNDABLE",
   	SUM(CHARGES."RENT_CHARGE") "RENT_CHARGE",
-  	SUM(CHARGES."OTHER_CHARGE") "OTHER_CHARGE"
+  	SUM(CHARGES."OTHER_CHARGE") "OTHER_CHARGE",
+  	LEASES."M_T_M"
 		
 	FROM LEASES
 	LEFT JOIN CHARGES
@@ -155,7 +157,8 @@ LEASES_CHARGES AS (
 	GROUP BY LEASES."LEASE_ID",
 		LEASES."UNIT_ID",
 		LEASES."status",
-		LEASES."TENANT" 
+		LEASES."TENANT",
+  		LEASES."M_T_M"
 	),
 SQ_FT_TEMP AS (
 	SELECT
@@ -169,38 +172,52 @@ SQ_FT_TEMP AS (
   	WHERE "public"."units"."deleted_at" IS NULL
   		AND "public"."properties"."deleted_at" IS NULL
 		AND "public"."properties"."company_relation_id" = 366
+  		AND "public"."units"."name" NOT LIKE '%INACTIVE%'
+		AND "public"."units"."name" NOT LIKE '%inactive%'
+		AND "public"."units"."name" NOT LIKE '%Inactive%'
 		
 	GROUP BY  "public"."properties"."id" 
 	),
 UNITS AS (
   SELECT 
-		"public"."properties"."id" AS "PROP_ID",
-		"public"."properties"."name" AS "PROP_NAME",
-		"public"."units"."id" AS "UNIT_ID",
-  		"public"."units"."name" AS "UNIT_NAME",
-		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT"
-  		
-	FROM   "public"."units"
-	INNER JOIN "public"."properties"
-		ON "public"."units"."property_id" = "public"."properties"."id"
-	
-  	WHERE "public"."properties"."name" IN (@Property_Name)
-		AND "public"."properties"."company_relation_id" = @REAL_COMPANY_ID
-		AND CAST("public"."properties"."property_type" AS TEXT) IN (@Property_Type)
-		AND CAST("public"."properties"."department" AS TEXT) IN (@Department)
-		
-  		AND "public"."properties"."deleted_at" IS NULL
-		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-		AND "public"."units"."name" NOT LIKE '%INACTIVE%'
-		AND "public"."units"."name" NOT LIKE '%inactive%'
-		AND "public"."units"."name" NOT LIKE '%Inactive%'
+    "public"."properties"."id" AS "PROP_ID",
+    "public"."properties"."name" AS "PROP_NAME",
+    "public"."units"."id" AS "UNIT_ID",
+    "public"."units"."name" AS "UNIT_NAME",
+    MAX(COALESCE(uq."value", "public"."units"."total_square_footage")) AS "UNIT_SQ_FT"
   
-	GROUP BY 
-		"public"."properties"."id",
-		"public"."properties"."name",
-		"public"."units"."id",
-  		"public"."units"."name"
-	),
+  FROM "public"."units"
+  INNER JOIN "public"."properties"
+    ON "public"."units"."property_id" = "public"."properties"."id"
+  
+  LEFT JOIN (
+    SELECT DISTINCT ON ("unit_id") 
+      "unit_id",
+      "value",
+      "as_of_date"
+    FROM "public"."unit_square_footage_items"
+    WHERE "square_footage_type" = 'Total'
+      AND "as_of_date" <= @AsOfDate
+    ORDER BY "unit_id", "as_of_date" DESC
+  ) AS uq
+    ON uq."unit_id" = "public"."units"."id"
+  
+  WHERE "public"."properties"."deleted_at" IS NULL
+    AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+    AND "public"."properties"."name" IN (@Property_Name)
+    AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+	AND CAST("public"."properties"."property_type" AS TEXT) IN (@Property_Type)
+	AND CAST("public"."properties"."department" AS TEXT) IN (@Department)
+	AND "public"."units"."name" NOT LIKE '%INACTIVE%'
+	AND "public"."units"."name" NOT LIKE '%inactive%'
+	AND "public"."units"."name" NOT LIKE '%Inactive%'
+  
+  GROUP BY 
+    "public"."properties"."id",
+    "public"."properties"."name",
+    "public"."units"."id",
+    "public"."units"."name"
+),
 FINAL AS (
 	select 
 		"LEASE_ID",
@@ -214,7 +231,8 @@ FINAL AS (
 		"DEPOSIT",
 		"REFUNDABLE",
 		"RENT_CHARGE",
-		"OTHER_CHARGE"
+		"OTHER_CHARGE",
+  		"M_T_M"
 	from LEASES_CHARGES
 	group by 
 		"LEASE_ID",
@@ -228,7 +246,8 @@ FINAL AS (
 		"DEPOSIT",
 		"REFUNDABLE",
 		"RENT_CHARGE",
-		"OTHER_CHARGE"
+		"OTHER_CHARGE",
+  		"M_T_M"
 	ORDER BY LEASES_CHARGES."LEASE_ID"
 	),
 FINAL_AUX AS (
@@ -251,7 +270,8 @@ CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END
 FINAL."TENANT",
 FINAL."lease_created_at" "lease_created_at",
 FINAL."start" "lease_start",
-FINAL."lease_end",	
+FINAL."lease_end",
+FINAL."M_T_M",
 UNITS."UNIT_SQ_FT" "UNIT_SQ_FT",
 CASE 	WHEN (FINAL_AUX."LEASES_COUNT" = 0 OR FINAL_AUX."LEASES_COUNT" IS NULL) THEN UNITS."UNIT_SQ_FT" 
 		ELSE UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
@@ -260,6 +280,7 @@ CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0
 		ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
 	END AS "Pct of Property",
 CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 
+			WHEN (FINAL_AUX."LEASES_COUNT" = 0 OR FINAL_AUX."LEASES_COUNT" IS NULL) THEN "UNIT_SQ_FT"/ SQ_FT_TEMP."TOT_SQ_FT" * 100 
 		ELSE ("UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") / SQ_FT_TEMP."TOT_SQ_FT" * 100 
 	END AS "Pct of Property_fix",
 FINAL."DEPOSIT",

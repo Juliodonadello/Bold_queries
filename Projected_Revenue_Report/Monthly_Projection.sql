@@ -14,7 +14,8 @@ CHARGES_TOT AS (
         "units"."property_id" AS "PROP_ID",
         "lease_recurring_charges"."unit_id" AS "UNIT_ID",
   		"public"."leases"."end" AS "LEASE_END",
-  		"lease_recurring_charge_amounts"."frequency" AS "FREQUENCY"
+  		"lease_recurring_charge_amounts"."frequency" AS "FREQUENCY", 
+  		"lease_recurring_charges"."terminate_date" AS "RCHARGE_END"
   
     FROM "public"."lease_recurring_charges"
     INNER JOIN "public"."lease_recurring_charge_amounts"
@@ -42,11 +43,11 @@ charged_amounts AS (
         ct."LEASE_ID",
         ct."EFFECTIVE_DATE",
         ct."AMOUNT" AS "AMOUNT_OLD",
-  		CASE
-            WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12
-            WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
+  		CASE 
+  				WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12
+  				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
 				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")  ) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 30
-  			ELSE ct."AMOUNT" 
+  				ELSE ct."AMOUNT" 
   		END AS "AMOUNT",
         ct."ITEM_ID",
         ct."PROP_ID",
@@ -58,6 +59,7 @@ charged_amounts AS (
     CROSS JOIN CHARGES_TOT ct
     WHERE ds."month" >= ct."EFFECTIVE_DATE"
   		AND ct."LEASE_END" >= ds."month"
+  		AND (ct."RCHARGE_END" >= ds."month" or ct."RCHARGE_END" is NULL)
 ),
 FINAL_TO_PIVOT AS (
     SELECT
@@ -117,7 +119,7 @@ INNER JOIN "public"."leases" ON fp."LEASE_ID" = "public"."leases"."id"
 INNER JOIN "public"."tenants" ON "public"."tenants"."id" = "public"."leases"."primaryTenantId"
 INNER JOIN "public"."properties" ON fp."PROP_ID" = "public"."properties"."id"
 
-WHERE CASE WHEN CAST("public"."leases"."month_to_month" AS TEXT) ='true' THEN 'True' ELSE 'False' END IN (@month_to_month)      
+WHERE CASE WHEN CAST("public"."leases"."month_to_month" AS TEXT) ='true' THEN 'True' ELSE 'False' END IN (@month_to_month) 
     AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
 
 GROUP BY
