@@ -53,8 +53,8 @@ RECOVERY_FINAL."ITEM_ID_NAME",
 RECOVERY_FINAL."base_year",
 RECOVERY_FINAL."base_amount",
 RECOVERY_FINAL."freq",
-RECOVERY_FINAL."next_date",
-RECOVERY_FINAL."effective_date",
+RECOVERY_FINAL."next_date", -- ver de modificar por recovery_to_date
+RECOVERY_FINAL."effective_date", -- ver de modificar por recovery_from_date
 RECOVERY_FINAL."RCHARGE_AMOUNT" as "CURRENT_AMOUNT"
 
 FROM "public"."properties" 
