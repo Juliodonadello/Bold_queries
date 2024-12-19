@@ -23,7 +23,7 @@ WITH CHARGES_TOT AS (
 		  WHEN "public"."leases"."status" = 'terminated' THEN 'Terminated'
 		  WHEN "public"."leases"."status" = 'future' THEN 'Future'
 		  ELSE 'null' 
-END AS "LEASE_STATUS"
+		END AS "LEASE_STATUS"
   
 	FROM "public"."lease_recurring_charges"
 	INNER JOIN "public"."lease_recurring_charge_amounts"

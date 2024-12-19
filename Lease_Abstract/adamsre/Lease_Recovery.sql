@@ -28,33 +28,34 @@ WHERE  	(("public"."lease_recovery_control"."calculation_control_base_year" IS N
 		 		OR 
 		 		("public"."recovery_control_expense_category"."manual_percent" IS NOT NULL)
 	   			)
-				AND "public"."properties"."name" IN (@Property_Name)
-				AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
-				AND (
-						  "public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
-						  OR
-						  "public"."lease_recurring_charges"."deleted_at" IS NULL
-						  )
-				AND (
-						  "public"."leases"."deleted_at" >= @AsOfDate
-						  OR
-						  "public"."leases"."deleted_at" IS NULL
-						  )
-				AND (
-						  "public"."leases"."end" >= @AsOfDate
-						  OR
-						  "public"."leases"."end" IS NULL
-						  )
-				AND (
-						  "public"."lease_recovery_control"."deleted_at" >= @AsOfDate
-						  OR
-						  "public"."lease_recovery_control"."deleted_at" IS NULL
-						  )
-				AND (
-						  "public"."recovery_control_expense_category"."deleted_at" >= @AsOfDate
-						  OR
-						  "public"."recovery_control_expense_category"."deleted_at" IS NULL
-						  )
-				AND (CASE WHEN "public"."leases"."month_to_month" = 'False' THEN 'NO'
-								  WHEN "public"."leases"."month_to_month" = 'True' THEN 'YES'
-							END) IN (@month_to_month)
+		AND "public"."properties"."name" IN (@Property_Name)
+		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
+		AND (
+					"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
+					OR
+					"public"."lease_recurring_charges"."deleted_at" IS NULL
+					)
+		AND (
+					"public"."leases"."deleted_at" >= @AsOfDate
+					OR
+					"public"."leases"."deleted_at" IS NULL
+					)
+		/*AND (
+					"public"."leases"."end" >= @AsOfDate
+					OR
+					"public"."leases"."end" IS NULL
+					)
+		*/
+		AND (
+					"public"."lease_recovery_control"."deleted_at" >= @AsOfDate
+					OR
+					"public"."lease_recovery_control"."deleted_at" IS NULL
+					)
+		AND (
+					"public"."recovery_control_expense_category"."deleted_at" >= @AsOfDate
+					OR
+					"public"."recovery_control_expense_category"."deleted_at" IS NULL
+					)
+		AND (CASE WHEN "public"."leases"."month_to_month" = 'False' THEN 'NO'
+							WHEN "public"."leases"."month_to_month" = 'True' THEN 'YES'
+				END) IN (@month_to_month)

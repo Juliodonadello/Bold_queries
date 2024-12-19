@@ -10,7 +10,7 @@ WITH LEATE_CHARGES AS (
   FROM "public"."lease_late_charges"
 	INNER JOIN "public"."leases"
 	  ON "public"."lease_late_charges"."lease_id" = "public"."leases"."id"
-	 INNER JOIN "public"."properties"
+	INNER JOIN "public"."properties"
 	  ON "public"."properties"."id" = "public"."leases"."property_id"
 
   where  CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)

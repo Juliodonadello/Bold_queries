@@ -44,7 +44,10 @@ charged_amounts AS (
         ct."EFFECTIVE_DATE",
         ct."AMOUNT" AS "AMOUNT_OLD",
   		CASE 
-  				WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12
+  				WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12  				
+  				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
+				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")  
+					 		 AND 31 = EXTRACT(DAY FROM ct."LEASE_END") ) then ct."AMOUNT"
   				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
 				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")  ) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 30
   				ELSE ct."AMOUNT" 
@@ -52,14 +55,46 @@ charged_amounts AS (
         ct."ITEM_ID",
         ct."PROP_ID",
         ct."UNIT_ID",
-        ROW_NUMBER() OVER (PARTITION BY ct."LEASE_ID", ct."ITEM_ID", ds."month" ORDER BY ct."EFFECTIVE_DATE" DESC) AS rn,
+        ROW_NUMBER() OVER (PARTITION BY ct."LEASE_ID", ct."ITEM_ID", ds."month" ORDER BY ct."EFFECTIVE_DATE" DESC) AS "rn",
   		ct."LEASE_END" 
     FROM
         date_series ds
     CROSS JOIN CHARGES_TOT ct
     WHERE ds."month" >= ct."EFFECTIVE_DATE"
   		AND ct."LEASE_END" >= ds."month"
-  		AND (ct."RCHARGE_END" >= ds."month" or ct."RCHARGE_END" is NULL)
+  		AND (ct."RCHARGE_END" >= ds."month" or ct."RCHARGE_END" is null)
+
+),
+q_units_aux as (
+  select "month",
+        "LEASE_ID",
+        "EFFECTIVE_DATE",
+        "ITEM_ID",
+        "PROP_ID",
+  		"LEASE_END",
+  		COUNT("UNIT_ID") "Q_UNITS"
+  	FROM charged_amounts
+  group by 1,2,3,4,5,6
+),
+charged_amounts_2 AS (
+	SELECT  charged_amounts."month",
+        charged_amounts."LEASE_ID",
+        charged_amounts."EFFECTIVE_DATE",
+        charged_amounts."ITEM_ID",
+        charged_amounts."PROP_ID",
+  		charged_amounts."LEASE_END",
+  		SUM(charged_amounts."AMOUNT") "AMOUNT"
+	FROM charged_amounts
+  		INNER JOIN q_units_aux	
+  			ON q_units_aux."month" = charged_amounts."month"
+			  AND q_units_aux."LEASE_ID" = charged_amounts."LEASE_ID"
+			  AND q_units_aux."EFFECTIVE_DATE" = charged_amounts."EFFECTIVE_DATE"
+			  AND q_units_aux."ITEM_ID" = charged_amounts."ITEM_ID"
+			  AND q_units_aux."PROP_ID" = charged_amounts."PROP_ID"
+			  AND q_units_aux."LEASE_END" = charged_amounts."LEASE_END"
+  	WHERE "rn"  <= q_units_aux."Q_UNITS"
+  	GROUP BY 1,2,3,4,5,6
+  	ORDER BY 1
 ),
 FINAL_TO_PIVOT AS (
     SELECT
@@ -67,15 +102,17 @@ FINAL_TO_PIVOT AS (
         EXTRACT(MONTH FROM ds."month") AS "MONTH",
         EXTRACT(YEAR FROM ds."month") AS "YEAR",
         ca."LEASE_ID",
-        COALESCE(ca."AMOUNT", 0) AS "AMOUNT",
+        SUM(COALESCE(ca."AMOUNT", 0)) AS "AMOUNT",
         ca."ITEM_ID",
-        ca."PROP_ID",
-        ca."UNIT_ID"
+        ca."PROP_ID"
+        --ca."UNIT_ID"
     FROM
         date_series ds
-    LEFT JOIN charged_amounts ca ON ds."month" = ca."month" AND ca.rn = 1
+    LEFT JOIN charged_amounts_2 ca ON ds."month" = ca."month"
+  GROUP BY 1,2,3,4,6,7
     ORDER BY ca."PROP_ID", ca."LEASE_ID", ca."ITEM_ID", ds."month"
 )
+
 SELECT
     fp."ITEM_ID",
     "public"."leases"."name",
