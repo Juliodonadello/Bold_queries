@@ -1,4 +1,5 @@
 SELECT "public"."insurances"."id",
+"public"."insurances"."deleted_at",
 "public"."insurances"."insurance_type",
 "public"."insurances"."company",
 "public"."insurances"."policy_number",
@@ -32,3 +33,6 @@ AND "public"."insurances"."expiration_date" <= @To_Date
 AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
 AND "public"."properties"."name" IN (@Property_Name)
 AND CAST("public"."insurances"."insurance_type" AS TEXT) IN (@Insurance_Type)
+AND ("public"."insurances"."deleted_at" >= @To_Date OR "public"."insurances"."deleted_at" IS NULL)
+AND ("public"."leases"."deleted_at" >= @To_Date OR "public"."leases"."deleted_at" IS NULL)
+

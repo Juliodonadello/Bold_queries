@@ -10,11 +10,12 @@ INNER JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."prim
 
 WHERE
 CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
--- AND "public"."leases"."status" = 'current' AND "public"."tenants"."deleted_at" IS NULL  -- no agrego este filtro porque no manejamos AsOfDate
 AND "public"."insurances"."expiration_date" >= @FromDate
 AND "public"."insurances"."expiration_date" <= @To_Date
 AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
 AND "public"."properties"."name" IN (@Property_Name)
+AND ("public"."insurances"."deleted_at" >= @To_Date OR "public"."insurances"."deleted_at" IS NULL)
+AND ("public"."leases"."deleted_at" >= @To_Date OR "public"."leases"."deleted_at" IS NULL)
 
 group by "public"."insurances"."insurance_type"
 
