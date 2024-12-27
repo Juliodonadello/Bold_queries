@@ -13,5 +13,4 @@ SELECT
         AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
         AND "public"."properties"."name" IN (@Property_Name)
         AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-  		AND ("public"."leases"."end" <= @To_Date 
-			 	OR "public"."leases"."end" is NULL)
+

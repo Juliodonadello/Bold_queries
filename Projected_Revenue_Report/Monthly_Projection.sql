@@ -61,10 +61,11 @@ charged_amounts AS (
         date_series ds
     CROSS JOIN CHARGES_TOT ct
     WHERE 
-  		--ds."month" >= ct."EFFECTIVE_DATE"
-  		( 	EXTRACT(MONTH FROM ds."month") >= EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
-			AND EXTRACT(YEAR FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE") 
-		)
+  		--ds."month" >= ct."EFFECTIVE_DATE" -- commented to avoid excluding proratiation if a charge start at the middle of the month.
+  		/*( 	EXTRACT(MONTH FROM ds."month") >= EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
+			AND EXTRACT(YEAR FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")  --commented to avoid excluding if a month < month from a older year
+		)*/ 
+  		(EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
   		AND ct."LEASE_END" >= ds."month"
   		AND (ct."RCHARGE_END" >= ds."month" or ct."RCHARGE_END" is null)
 

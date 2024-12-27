@@ -240,7 +240,7 @@ FINAL_AUX AS (
     "UNIT_ID"
     FROM FINAL
     GROUP BY "UNIT_ID"
-)
+),
 
 FINAL_LEASE_LEVEL AS (
 
@@ -287,38 +287,64 @@ FINAL_LEASE_LEVEL AS (
     where  "PROP_NAME" IN (@Property_Name)
         AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 
-    order by "PROP_NAME", UNITS."UNIT_NAME"
-)
-
-SELECT 
-
-    UNITS."PROP_ID",
-    UNITS."PROP_NAME",
+    order by UNITS."PROP_NAME", UNITS."UNIT_NAME"
+)/*, 
+TENANTS AS (
+    SELECT "PROP_NAME",
+    "LEASE_ID",
+    "LEASE_NAME",
+	"TENANT"
+FROM FINAL_LEASE_LEVEL
+GROUP BY 1,2,3,4
+),
+TENANTS_FINAL AS (
+  select 
+    "PROP_NAME",
+    "LEASE_ID",
+    "LEASE_NAME",
+	string_agg("TENANT", ', ') "TENANT"
+FROM TENANTS
+GROUP BY 1,2,3
+)*/
+SELECT
+    "PROP_ID",
+    "PROP_NAME",
     "LEASE_ID",
     "LEASE_NAME",
     "LEASE_STATUS",
     "lease_created_at",
     "lease_start",
     "lease_end",    
-    CONCAT("UNIT_NAME", ',') "UNIT_NAME" ,
-    CONCAT("TENANT", ',') "TENANT",
+	string_agg("UNIT_NAME", ', ') "UNIT_NAME",
+	--string_agg("TENANT", ', ') "TENANT_w_duplicates",
+	--MAX(TENANTS_FINAL."TENANT") "TENANT",
+	MAX("TENANT") "TENANT",
+
     SUM("UNIT_SQ_FT") "LEASE_SQ_FT", --NEW NAME
     SUM("UNIT_SQ_FT_fix") "UNIT_SQ_FT_fix",
     SUM("Pct of Property") "Pct of Property",
     SUM("Pct of Property_fix") "Pct of Property_fix",
-    
-    SUM("DEPOSIT") "DEPOSIT",
-    CONCAT("REFUNDABLE") "REFUNDABLE",
+    --string_agg("DEPOSIT", ', ') "DEPOSIT",
+	MAX("DEPOSIT") "DEPOSIT",
+	--string_agg("REFUNDABLE", ', ') "REFUNDABLE",
+	MAX("REFUNDABLE") "REFUNDABLE",
     SUM("RENT_AMOUNT") "RENT_AMOUNT",
     SUM("OTHER_AMOUNT") "OTHER_AMOUNT",
     SUM("ANNUAL_RENT_AMOUNT") "ANNUAL_RENT_AMOUNT",
     SUM("ANNUAL_OTHER_AMOUNT") "ANNUAL_OTHER_AMOUNT",
-    
-    SUM("ANNUAL_RENT_AMOUNT")/SUM("UNIT_SQ_FT") "Annual Rent/Sq Ft",
-    SUM("ANNUAL_OTHER_AMOUNT")/SUM("UNIT_SQ_FT") "Annual Other/Sq Ft",
+	SUM("ANNUAL_RENT_AMOUNT") / NULLIF(SUM("UNIT_SQ_FT"), 0) AS "Annual Rent/Sq Ft",
+	SUM("ANNUAL_OTHER_AMOUNT") / NULLIF(SUM("UNIT_SQ_FT"), 0) AS "Annual Other/Sq Ft"
+
 
 FROM FINAL_LEASE_LEVEL
-
+/*
+LEFT JOIN TENANTS_FINAL ON FINAL_LEASE_LEVEL."PROP_NAME" = TENANTS_FINAL."PROP_NAME"
+						AND FINAL_LEASE_LEVEL."LEASE_ID" = TENANTS_FINAL."LEASE_ID"
+						AND FINAL_LEASE_LEVEL."LEASE_NAME" = TENANTS_FINAL."LEASE_NAME"
+*/
 GROUP BY 1,2,3,4,5,6,7,8
 
 ORDER BY 2,4
+
+
+
