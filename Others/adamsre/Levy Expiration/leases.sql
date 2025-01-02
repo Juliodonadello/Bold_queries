@@ -46,7 +46,7 @@ CHARGES_TOT AS (
   		AND CHARGE_CONTROL. "ITEM_ID" = "public"."lease_recurring_charges"."order_entry_item_id"
   
   	WHERE "public"."lease_recurring_charge_amounts"."effective_date" <= @To_Date
-	AND "public"."lease_recurring_charge_amounts"."effective_date" >= @From_Date
+	--AND "public"."lease_recurring_charge_amounts"."effective_date" >= @From_Date
 	AND (
 		"public"."lease_recurring_charge_amounts"."deleted_at" >= @To_Date 
 		OR 
@@ -66,62 +66,95 @@ CHARGES_TOT AS (
 		  	AND CAST(EXTRACT(DAY FROM (@From_Date - "public"."lease_recurring_charge_amounts"."effective_date")) AS INTEGER) < 31
 		)--one time charge with less than a month differnce
 		)
-
 ),
 MAX_CHARGES AS (
  	SELECT  "RCHARGE_ID" "RCHARGE_ID",
-   	MAX("EFFECTIVE_DATE") "EFFECTIVE_DATE"
+   	--MAX("EFFECTIVE_DATE") "EFFECTIVE_DATE" -- using MIN based in Lynn requests
+  	MIN("EFFECTIVE_DATE") "EFFECTIVE_DATE"
  	FROM CHARGES_TOT
+	WHERE "EFFECTIVE_DATE" >= @From_Date
 	GROUP BY "RCHARGE_ID"
  ),
-CHARGES AS ( 
- SELECT CHARGES_TOT.*
- FROM CHARGES_TOT
- INNER JOIN MAX_CHARGES
- 	ON CHARGES_TOT."RCHARGE_ID" =  MAX_CHARGES."RCHARGE_ID" 
-	AND CHARGES_TOT."EFFECTIVE_DATE" =  MAX_CHARGES."EFFECTIVE_DATE"
-  GROUP BY 
+FILLER_CHARGES AS (
+ 	SELECT  "RCHARGE_ID" "RCHARGE_ID",
+  	MAX("EFFECTIVE_DATE") "EFFECTIVE_DATE"
+ 	FROM CHARGES_TOT
+	WHERE "EFFECTIVE_DATE" < @From_Date
+	GROUP BY "RCHARGE_ID"
+ ),
+CHARGES_FILLER AS ( 
+ SELECT 
   CHARGES_TOT."LEASE_ID",
-  CHARGES_TOT."RENT_CHARGE",
-  CHARGES_TOT."ELEC_CHARGE",
-  CHARGES_TOT."RETax_CHARGE",
-  CHARGES_TOT."OTHER_CHARGE",
-  CHARGES_TOT."EFFECTIVE_DATE",
-  CHARGES_TOT."PROP_ID",
+  CHARGES_TOT."PROP_ID", 
   CHARGES_TOT."UNIT_ID",
-  CHARGES_TOT."FREQUENCY",
-  CHARGES_TOT."RCHARGE_ID"
+  SUM(CASE WHEN CHARGES_TOT."FREQUENCY" = 'Annually' THEN CHARGES_TOT."RENT_CHARGE"/12 ELSE CHARGES_TOT."RENT_CHARGE" END) "RENT_CHARGE",
+  SUM(CASE WHEN CHARGES_TOT."FREQUENCY" = 'Annually' THEN CHARGES_TOT."ELEC_CHARGE"/12 ELSE CHARGES_TOT."ELEC_CHARGE" END) "ELEC_CHARGE",
+  SUM(CASE WHEN CHARGES_TOT."FREQUENCY" = 'Annually' THEN CHARGES_TOT."RETax_CHARGE"/12 ELSE CHARGES_TOT."RETax_CHARGE" END) "RETax_CHARGE",
+  SUM(CASE WHEN CHARGES_TOT."FREQUENCY" = 'Annually' THEN CHARGES_TOT."OTHER_CHARGE"/12 ELSE CHARGES_TOT."OTHER_CHARGE" END) "OTHER_CHARGE"  
+
+ FROM CHARGES_TOT
+ INNER JOIN FILLER_CHARGES
+ 	ON CHARGES_TOT."RCHARGE_ID" =  FILLER_CHARGES."RCHARGE_ID" 
+	AND CHARGES_TOT."EFFECTIVE_DATE" =  FILLER_CHARGES."EFFECTIVE_DATE"
+ GROUP BY 1,2,3
+ ),
+CHARGES AS ( 
+	 SELECT 
+  CHARGES_TOT."LEASE_ID",
+  CHARGES_TOT."PROP_ID", 
+  CHARGES_TOT."UNIT_ID",
+  SUM(CASE WHEN CHARGES_TOT."FREQUENCY" = 'Annually' THEN CHARGES_TOT."RENT_CHARGE"/12 ELSE CHARGES_TOT."RENT_CHARGE" END) "RENT_CHARGE",
+  SUM(CASE WHEN CHARGES_TOT."FREQUENCY" = 'Annually' THEN CHARGES_TOT."ELEC_CHARGE"/12 ELSE CHARGES_TOT."ELEC_CHARGE" END) "ELEC_CHARGE",
+  SUM(CASE WHEN CHARGES_TOT."FREQUENCY" = 'Annually' THEN CHARGES_TOT."RETax_CHARGE"/12 ELSE CHARGES_TOT."RETax_CHARGE" END) "RETax_CHARGE",
+  SUM(CASE WHEN CHARGES_TOT."FREQUENCY" = 'Annually' THEN CHARGES_TOT."OTHER_CHARGE"/12 ELSE CHARGES_TOT."OTHER_CHARGE" END) "OTHER_CHARGE"
+	FROM CHARGES_TOT
+	INNER JOIN MAX_CHARGES
+		ON CHARGES_TOT."RCHARGE_ID" =  MAX_CHARGES."RCHARGE_ID" 
+		AND CHARGES_TOT."EFFECTIVE_DATE" =  MAX_CHARGES."EFFECTIVE_DATE"
+	GROUP BY 1,2,3
 ),
 FINAL AS (
-SELECT "public"."leases"."id",
-	"public"."leases"."name" AS "LEASE_NAME",
-	"public"."leases"."end" AS "LEASE_END",
-	"public"."units"."name" AS "units_name",
-	"public"."units"."total_square_footage" AS "total_square_footage",
-	"public"."tenants"."name" AS "TENANT_NAME",
-	"public"."properties"."name" AS "properties_name",
-	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."RENT_CHARGE" / 12 ELSE CHARGES."RENT_CHARGE" END) AS "RENT_AMOUNT",
-	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."ELEC_CHARGE" / 12 ELSE CHARGES."ELEC_CHARGE" END) AS "ELEC_CHARGE",
-	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."RETax_CHARGE" / 12 ELSE CHARGES."RETax_CHARGE" END) AS "RETax_CHARGE",
-  	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."OTHER_CHARGE" / 12 ELSE CHARGES."OTHER_CHARGE" END) AS "OTHER_AMOUNT"
+	SELECT "public"."leases"."id",
+		"public"."leases"."name" AS "LEASE_NAME",
+		"public"."leases"."end" AS "LEASE_END",
+		"public"."units"."name" AS "units_name",
+		"public"."units"."total_square_footage" AS "total_square_footage",
+		"public"."tenants"."name" AS "TENANT_NAME",
+		"public"."properties"."name" AS "properties_name",
+		CASE WHEN CHARGES."RENT_CHARGE" = 0 THEN CHARGES_FILLER."RENT_CHARGE"
+  				ELSE CHARGES."RENT_CHARGE"
+  				END AS "RENT_CHARGE",
+		CASE WHEN CHARGES."ELEC_CHARGE" = 0 THEN CHARGES_FILLER."ELEC_CHARGE"
+  				ELSE CHARGES."ELEC_CHARGE"
+  				END AS "ELEC_CHARGE",
+  		CASE WHEN CHARGES."RETax_CHARGE" = 0 THEN CHARGES_FILLER."RETax_CHARGE"
+  				ELSE CHARGES."RETax_CHARGE"
+  				END AS "RETax_CHARGE" ,
+  		CASE WHEN CHARGES."OTHER_CHARGE" = 0 THEN CHARGES_FILLER."OTHER_CHARGE"
+  				ELSE CHARGES."OTHER_CHARGE"
+  				END AS "OTHER_CHARGE" 
+  
+	FROM "public"."leases"
+	INNER  JOIN "public"."leases_units_units" ON "public"."leases"."id"="public"."leases_units_units"."leasesId"
+	INNER  JOIN "public"."units" ON "public"."units"."id"="public"."leases_units_units"."unitsId"
+	INNER  JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
+	INNER  JOIN "public"."properties" ON "public"."units"."property_id"="public"."properties"."id"
+	LEFT JOIN CHARGES ON "public"."leases"."id" = CHARGES."LEASE_ID"
+					AND  "public"."units"."id" = CHARGES."UNIT_ID"
+					AND  "public"."properties"."id" = CHARGES."PROP_ID"
+	LEFT JOIN CHARGES_FILLER ON "public"."leases"."id" = CHARGES_FILLER."LEASE_ID"
+					AND  "public"."units"."id" = CHARGES_FILLER."UNIT_ID"
+					AND  "public"."properties"."id" = CHARGES_FILLER."PROP_ID"
+  					--AND  CHARGES."RCHARGE_ID" != CHARGES_FILLER."RCHARGE_ID"
 
-FROM "public"."leases"
-INNER  JOIN "public"."leases_units_units" ON "public"."leases"."id"="public"."leases_units_units"."leasesId"
-INNER  JOIN "public"."units" ON "public"."units"."id"="public"."leases_units_units"."unitsId"
-INNER  JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
-INNER  JOIN "public"."properties" ON "public"."units"."property_id"="public"."properties"."id"
-LEFT JOIN CHARGES ON "public"."leases"."id" = CHARGES."LEASE_ID"
-				AND  "public"."units"."id" = CHARGES."UNIT_ID"
-				AND  "public"."properties"."id" = CHARGES."PROP_ID"
+	WHERE  "public"."leases"."end" <= (@To_Date) 
+		AND "public"."leases"."end" >= (@From_Date) 
+		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+		AND "public"."properties"."name" IN (@Property_Name)
 
-WHERE  "public"."leases"."end" <= (@To_Date) 
-	AND "public"."leases"."end" >= (@From_Date) 
-    AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-	AND "public"."properties"."name" IN (@Property_Name)
+	--GROUP BY 1,2,3,4,5,6,7
 
-GROUP BY 1,2,3,4,5,6,7
-
-ORDER BY 7,2
+	ORDER BY 7,2
 )
 SELECT "LEASE_NAME",
 	"LEASE_END",
@@ -129,12 +162,12 @@ SELECT "LEASE_NAME",
 	"total_square_footage",
 	"TENANT_NAME",
 	"properties_name",
-	SUM("RENT_AMOUNT") AS "RENT_AMOUNT",
+	SUM("RENT_CHARGE") AS "RENT_CHARGE",
 	SUM("ELEC_CHARGE") "ELEC_CHARGE",
 	SUM("RETax_CHARGE") "RETax_CHARGE",
-	SUM("OTHER_AMOUNT") "OTHER_AMOUNT",
-    SUM("RENT_AMOUNT"+"ELEC_CHARGE"+"RETax_CHARGE"+"OTHER_AMOUNT") AS "TOTAL_CHARGES",
-    SUM(("RENT_AMOUNT"+"ELEC_CHARGE"+"RETax_CHARGE"+"OTHER_AMOUNT")/"total_square_footage") AS "TOTAL_CHARGES_sqft"
+	SUM("OTHER_CHARGE") "OTHER_CHARGE",
+    SUM("RENT_CHARGE"+"ELEC_CHARGE"+"RETax_CHARGE"+"OTHER_CHARGE") AS "TOTAL_CHARGES",
+    SUM(("RENT_CHARGE"+"ELEC_CHARGE"+"RETax_CHARGE"+"OTHER_CHARGE")/ NULLIF("total_square_footage", 0)) AS "TOTAL_CHARGES_sqft"
     
 FROM FINAL
 
