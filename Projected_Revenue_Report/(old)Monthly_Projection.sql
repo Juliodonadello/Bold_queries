@@ -1,5 +1,5 @@
 WITH RECURSIVE date_series AS (
-    SELECT  (@From_Date::DATE - INTERVAL '1 month')::DATE as month --@From_Date::DATE as month
+    SELECT @From_Date::DATE as month
     UNION ALL
     SELECT (month + INTERVAL '1 month')::DATE
     FROM date_series
@@ -30,32 +30,28 @@ CHARGES_TOT AS (
     WHERE "lease_recurring_charge_amounts"."effective_date" <= @To_Date
         AND ("lease_recurring_charge_amounts"."deleted_at" >= @To_Date OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
         AND ("lease_recurring_charges"."deleted_at" >= @To_Date OR "lease_recurring_charges"."deleted_at" IS NULL)
+        --AND ("lease_recurring_charges"."terminate_date" >= @To_Date OR "lease_recurring_charges"."terminate_date" IS NULL)
         AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
         AND "public"."properties"."name" IN (@Property_Name)
         AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-  		AND ("lease_recurring_charge_amounts"."effective_date" <= "public"."leases"."end" OR "public"."leases"."end" is NULL)
+  		AND ("lease_recurring_charge_amounts"."effective_date" <= "public"."leases"."end"
+			OR "public"."leases"."end" is NULL)
 ),
 charged_amounts AS (
     SELECT
         ds."month",
         ct."LEASE_ID",
         ct."EFFECTIVE_DATE",
-  		-- proration in lease end calculation
+        ct."AMOUNT" AS "AMOUNT_OLD",
   		CASE 
-  				WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12
+  				WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12  				
   				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
 				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")  
 					 		 AND 31 = EXTRACT(DAY FROM ct."LEASE_END") ) then ct."AMOUNT"
   				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
-				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 31	
-  				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
-				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")  
-					 		 AND 1 = EXTRACT(DAY FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT"
-				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
-								 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT" * (31-EXTRACT(DAY FROM ct."EFFECTIVE_DATE")+1) / 31	 --FALTA RELLENAR CON LOS DIAS CON EL EFFECTIVE DATE ANTERIOR 
-                ELSE ct."AMOUNT" 
+				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")  ) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 30
+  				ELSE ct."AMOUNT" 
   		END AS "AMOUNT",
-  		--end proration in lease end
         ct."ITEM_ID",
         ct."PROP_ID",
         ct."UNIT_ID",
@@ -64,9 +60,15 @@ charged_amounts AS (
     FROM
         date_series ds
     CROSS JOIN CHARGES_TOT ct
-    WHERE (EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
-  		AND (ct."LEASE_END" >= ds."month" or ct."LEASE_END" is null)
+    WHERE 
+  		--ds."month" >= ct."EFFECTIVE_DATE" -- commented to avoid excluding proratiation if a charge start at the middle of the month.
+  		/*( 	EXTRACT(MONTH FROM ds."month") >= EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
+			AND EXTRACT(YEAR FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")  --commented to avoid excluding if a month < month from a older year
+		)*/ 
+  		(EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
+  		AND ct."LEASE_END" >= ds."month"
   		AND (ct."RCHARGE_END" >= ds."month" or ct."RCHARGE_END" is null)
+
 ),
 q_units_aux as (
   select "month",
@@ -79,33 +81,6 @@ q_units_aux as (
   	FROM charged_amounts
   group by 1,2,3,4,5,6
 ),
-charged_amounts_with_prev AS (
-    SELECT
-        ca."month",
-        ca."LEASE_ID",
-        ca."EFFECTIVE_DATE",
-        ca."ITEM_ID",
-        ca."PROP_ID",
-        ca."UNIT_ID",
-        ca."LEASE_END",
-  		ca."rn",
-        ca."AMOUNT",
-        LAG(ca."AMOUNT") OVER (
-            PARTITION BY ca."LEASE_ID", ca."ITEM_ID", ca."UNIT_ID" 
-            ORDER BY ca."month"
-        ) AS "AMOUNT_OLD"
-    FROM charged_amounts ca
-),
-final_ca as (
-select charged_amounts_with_prev.*,
-CASE WHEN ( EXTRACT(MONTH FROM "month") = EXTRACT(MONTH FROM "EFFECTIVE_DATE") 
-						AND EXTRACT(YEAR FROM "month") = EXTRACT(YEAR FROM "EFFECTIVE_DATE") ) 
-			then "AMOUNT" + ( "AMOUNT_OLD" * ((EXTRACT(DAY FROM "EFFECTIVE_DATE")-1)) / 31 ) --filling proration with previous charged amount 
-			ELSE "AMOUNT"
-			END AS "PRORATED_AMOUNT"
-from charged_amounts_with_prev
-where "LEASE_ID" = '10580' and "rn" = 1 and "month" >= @From_Date
-),
 charged_amounts_2 AS (
 	SELECT  charged_amounts."month",
         charged_amounts."LEASE_ID",
@@ -113,10 +88,8 @@ charged_amounts_2 AS (
         charged_amounts."ITEM_ID",
         charged_amounts."PROP_ID",
   		charged_amounts."LEASE_END",
-  		SUM(charged_amounts."AMOUNT") "AMOUNT_OLD",
-  		SUM(charged_amounts."PRORATED_AMOUNT") "AMOUNT"
-  		
-	FROM final_ca as charged_amounts
+  		SUM(charged_amounts."AMOUNT") "AMOUNT"
+	FROM charged_amounts
   		INNER JOIN q_units_aux	
   			ON q_units_aux."month" = charged_amounts."month"
 			  AND q_units_aux."LEASE_ID" = charged_amounts."LEASE_ID"
