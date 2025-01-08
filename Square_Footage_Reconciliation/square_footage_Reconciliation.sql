@@ -23,6 +23,7 @@ WITH SQ_FT_TEMP AS (
   		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 		AND "public"."properties"."name" IN (@Property_Name)
 		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
+		AND "public"."units"."status" = 'active'
 		
 	GROUP BY  1,3,4,5,6
   		
@@ -51,6 +52,7 @@ UNITS AS (
   	AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
 	AND "public"."properties"."name" IN (@Property_Name)
 	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
+	AND "public"."units"."status" = 'active'
 
 	GROUP BY 
 		"public"."properties"."id",
