@@ -104,7 +104,7 @@ CASE WHEN ( EXTRACT(MONTH FROM "month") = EXTRACT(MONTH FROM "EFFECTIVE_DATE")
 			ELSE "AMOUNT"
 			END AS "PRORATED_AMOUNT"
 from charged_amounts_with_prev
-where "LEASE_ID" = '10580' and "rn" = 1 and "month" >= @From_Date
+where "rn" = 1 and "month" >= @From_Date
 ),
 charged_amounts_2 AS (
 	SELECT  charged_amounts."month",
