@@ -113,11 +113,10 @@ LEASES AS (
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
 	WHERE 
-		(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
-  			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
-		)
-		AND "public"."leases"."status" = 'current'
+		( "public"."leases"."end" > @AsOfDate AND "public"."leases"."end" IS NULL)
+		--AND "public"."leases"."status" = 'current' or 
 		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
+		AND  CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
   	
   GROUP BY
   		"public"."leases"."id",

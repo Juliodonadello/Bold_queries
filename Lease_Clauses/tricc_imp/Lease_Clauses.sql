@@ -19,8 +19,8 @@ FROM "public"."lease_options"
          INNER JOIN "public"."leases" ON "public"."lease_options"."leaseId" = "public"."leases"."id"
          inner join "public"."properties" on "public"."properties"."id" = "public"."leases"."property_id"
 		 LEFT JOIN "public"."tenants" on "public"."leases"."primaryTenantId" = "public"."tenants"."id"
-		 INNER JOIN "public"."leases_units_units" on "public"."leases"."id" = "public"."leases_units_units"."leasesId"
-		 INNER JOIN "public"."units" on "public"."leases_units_units"."unitsId" = "public"."units"."id"
+		 INNER JOIN "public"."lease_units" on "public"."leases"."id" = "public"."lease_units"."lease_id"
+		 INNER JOIN "public"."units" on "public"."lease_units"."unit_id" = "public"."units"."id"
 		 
 WHERE CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
   AND "public"."properties"."name" IN (@Property_Name)

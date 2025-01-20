@@ -28,10 +28,10 @@ CHARGES_TOT AS (
 	FROM "public"."lease_recurring_charges"
 	LEFT OUTER JOIN "public"."lease_recurring_charge_amounts"
 		ON "public"."lease_recurring_charges"."id" = "public"."lease_recurring_charge_amounts"."recurring_charge_id"
-	--INNER JOIN "public"."leases_units_units"  --aumenta los registros pero esta bien que se duplique un lease con distintas units
-  	--	ON "public"."lease_recurring_charges"."lease_id" ="public"."leases_units_units"."leasesId"
+	--INNER JOIN "public"."lease_units"  --aumenta los registros pero esta bien que se duplique un lease con distintas units
+  	--	ON "public"."lease_recurring_charges"."lease_id" ="public"."lease_units"."lease_id"
  	 INNER JOIN "public"."units"
-  		--ON "public"."leases_units_units"."unitsId" =  "public"."units"."id"
+  		--ON "public"."lease_units"."unit_id" =  "public"."units"."id"
   		ON "public"."lease_recurring_charges"."unit_id" =  "public"."units"."id"
   	INNER JOIN CHARGE_CONTROL
   		ON CHARGE_CONTROL. "PROP_ID" = "public"."units"."property_id"
@@ -93,7 +93,7 @@ CHARGES AS (
 	),
 LEASES AS (
   SELECT "public"."leases"."id" AS "LEASE_ID",
-		"public"."leases_units_units"."unitsId" AS "UNIT_ID",
+		"public"."lease_units"."unit_id" AS "UNIT_ID",
 		"public"."leases"."created_at" AS "lease_created_at",
   		"public"."leases"."start" AS "start",
 		"public"."leases"."end" AS "lease_end",
@@ -109,8 +109,8 @@ LEASES AS (
 		"public"."leases"."month_to_month" AS "M_T_M"
   
   FROM "public"."leases"
-	INNER JOIN "public"."leases_units_units"
-		ON "public"."leases"."id" ="public"."leases_units_units"."leasesId"
+	INNER JOIN "public"."lease_units"
+		ON "public"."leases"."id" ="public"."lease_units"."lease_id"
 	LEFT OUTER JOIN "public"."lease_deposits"
 		ON "public"."leases"."id" = "public"."lease_deposits"."lease_id"
 		AND ("public"."lease_deposits"."deleted_at" >= @AsOfDate OR "public"."lease_deposits"."deleted_at" IS  NULL)
@@ -124,7 +124,7 @@ LEASES AS (
   	
   GROUP BY
   		"public"."leases"."id",
-		"public"."leases_units_units"."unitsId",
+		"public"."lease_units"."unit_id",
 		"public"."leases"."created_at",
   		"public"."leases"."start",
 		"public"."leases"."end",

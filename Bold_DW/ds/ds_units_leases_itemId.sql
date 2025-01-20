@@ -50,11 +50,11 @@ SELECT
 "public"."tenants"."name" AS "tenant_name",
 "public"."tenants"."email"  AS "tenant_email",
 "public"."tenants"."phone"  AS "tenant_phone",
-"public"."leases_units_units"."unitsId" AS "unit_id",
+"public"."lease_units"."unit_id" AS "unit_id",
  "public"."leases"."property_id"  AS "prop_id"
 
 FROM "public"."leases" 
-INNER JOIN "public"."leases_units_units" ON "public"."leases"."id"="public"."leases_units_units"."leasesId" 
+INNER JOIN "public"."lease_units" ON "public"."leases"."id"="public"."lease_units"."lease_id" 
 INNER JOIN "public"."properties" ON "public"."properties"."id"="public"."leases"."property_id"
 INNER JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
 

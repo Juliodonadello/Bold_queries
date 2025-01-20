@@ -13,16 +13,16 @@ SELECT "public"."insurances"."id",
 "public"."insurances"."email_cc",
 "public"."leases"."name",
 "public"."leases"."status",
-"public"."leases_units_units"."leasesId",
-"public"."leases_units_units"."unitsId",
+"public"."lease_units"."lease_id",
+"public"."lease_units"."unit_id",
 "public"."units"."name" AS "units_name",
 "public"."properties"."name" AS "property_name",
 "public"."tenants"."name" as "primary_tenant_name"
 
 FROM "public"."insurances" 
 INNER JOIN "public"."leases" ON "public"."insurances"."lease_id"="public"."leases"."id" 
-INNER JOIN "public"."leases_units_units" ON "public"."leases"."id"="public"."leases_units_units"."leasesId"
-INNER JOIN "public"."units" ON "public"."leases_units_units"."unitsId"="public"."units"."id"
+INNER JOIN "public"."lease_units" ON "public"."leases"."id"="public"."lease_units"."lease_id"
+INNER JOIN "public"."units" ON "public"."lease_units"."unit_id"="public"."units"."id"
 INNER JOIN "public"."properties" ON "public"."leases"."property_id"="public"."properties"."id"
 INNER JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
 

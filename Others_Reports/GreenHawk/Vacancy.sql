@@ -1,6 +1,6 @@
 WITH LEASES AS (
   SELECT "public"."leases"."id" AS "LEASE_ID",
-		"public"."leases_units_units"."unitsId" AS "UNIT_ID",
+		"public"."lease_units"."unit_id" AS "UNIT_ID",
 		"public"."leases"."created_at" AS "lease_created_at",
   		"public"."leases"."start" AS "start",
 		"public"."leases"."end" AS "lease_end",
@@ -10,21 +10,22 @@ WITH LEASES AS (
 		"public"."leases"."name" AS "LEASE_NAME"
   
   FROM "public"."leases"
-	INNER JOIN "public"."leases_units_units"
-		ON "public"."leases"."id" ="public"."leases_units_units"."leasesId"
+	INNER JOIN "public"."lease_units"
+		ON "public"."leases"."id" ="public"."lease_units"."lease_id"
 	LEFT OUTER JOIN "public"."lease_deposits"
 		ON "public"."leases"."id" = "public"."lease_deposits"."lease_id" 
 	LEFT OUTER JOIN "public"."tenants"
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
 	WHERE 
-		("public"."leases"."end" < @AsOfDate OR  "public"."leases"."end" IS NULL)
+		--("public"."leases"."end" < @AsOfDate OR  "public"."leases"."end" IS NULL)
 		--AND "public"."leases"."status" != 'current'
-		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
+		--AND 
+		("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
   	
   GROUP BY
   		"public"."leases"."id",
-		"public"."leases_units_units"."unitsId",
+		"public"."lease_units"."unit_id",
 		"public"."leases"."created_at",
   		"public"."leases"."start",
 		"public"."leases"."end",
@@ -51,7 +52,6 @@ SQ_FT_TEMP AS (
 	WHERE "public"."units"."deleted_at" IS NULL
   		AND "public"."properties"."deleted_at" IS NULL
 		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-		AND "public"."units"."status" = 'active'
 		
 	GROUP BY  "public"."properties"."id" 
 	),
@@ -77,7 +77,6 @@ UNITS AS (
   	WHERE "public"."properties"."deleted_at" IS NULL
 		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-		AND "public"."units"."status" = 'active'
   		
 	GROUP BY 
 		1,2,3,4,5,6,7
@@ -114,26 +113,69 @@ FINAL_AUX AS (
     "UNIT_ID"
     FROM FINAL
     GROUP BY "UNIT_ID"
-),
-FINAL_GROUP AS (
+	)
+
+SELECT 
 FINAL."PROP_ID",
 FINAL."PROP_NAME",
-COUNT(FINAL."UNIT_ID") "Q_UNITS",
-SUM( CASE WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN  FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" ELSE FINAL."UNIT_SQ_FT" END) AS  "UNIT_SQ_FT_fix",
-SUM( CASE WHEN FINAL."lease_created_at" IS NULL AND FINAL_AUX."LEASES_COUNT" > 0 THEN FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
+FINAL."UNIT_ID",
+FINAL."UNIT_NAME" "UNIT_NAME" ,
+--CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS",
+CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS", -- esto se hizo porque los status future se deben ver como Occupied si el asofdate coincide
+FINAL."original_lease_status",
+FINAL."TENANT",
+FINAL."lease_created_at" "lease_created_at",
+FINAL."start" "lease_start",
+FINAL."lease_end",	
+CASE 	WHEN FINAL."EFF_UNIT_SQ_FT" IS NULL THEN FINAL."UNIT_SQ_FT" 
+			ELSE FINAL."EFF_UNIT_SQ_FT"
+END AS "UNIT_SQ_FT",
+CASE WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN  FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" ELSE FINAL."UNIT_SQ_FT" END AS  "UNIT_SQ_FT_fix",
+/*
+CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN UNITS."UNIT_SQ_FT" ELSE NULL END AS  "OCCUPIED_UNIT_SQ_FT",
+CASE WHEN FINAL."lease_created_at" IS NOT NULL AND FINAL_AUX."LEASES_COUNT" > 0 THEN UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
+		 WHEN FINAL."lease_created_at" IS NOT NULL THEN UNITS."UNIT_SQ_FT"
+		ELSE NULL 
+	END AS  "OCCUPIED_UNIT_SQ_FT_fix",
+*/
+CASE WHEN FINAL."lease_created_at" IS NULL THEN FINAL."UNIT_SQ_FT" ELSE NULL END AS  "VACCANT_UNIT_SQ_FT",
+CASE WHEN FINAL."lease_created_at" IS NULL AND FINAL_AUX."LEASES_COUNT" > 0 THEN FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
 		 WHEN FINAL."lease_created_at" IS NULL THEN FINAL."UNIT_SQ_FT"
 		ELSE NULL 
-	END) AS  "VACCANT_UNIT_SQ_FT_fix",
-SUM( CASE WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 or SQ_FT_TEMP."TOT_SQ_FT" IS NULL THEN 0
+	END AS  "VACCANT_UNIT_SQ_FT_fix",
+
+CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 
+		ELSE FINAL."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
+	END AS "Pct of Property",
+CASE	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 or SQ_FT_TEMP."TOT_SQ_FT" IS NULL THEN 0
 		WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN (FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") / SQ_FT_TEMP."TOT_SQ_FT" * 100
 		WHEN FINAL_AUX."LEASES_COUNT" <= 0 OR FINAL_AUX."LEASES_COUNT" IS NULL THEN FINAL."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100
 		ELSE NULL 
-	END) AS  "Pct of Property_fix",
-SUM( CASE WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 or SQ_FT_TEMP."TOT_SQ_FT" IS NULL THEN 0 -- UNIT WITHOUT SQ FT
+	END AS  "Pct of Property_fix",
+
+/*
+CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 
+		WHEN FINAL."lease_created_at" IS NULL THEN 0 
+		ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
+	END AS "OCC Pct of Property",
+CASE	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 or SQ_FT_TEMP."TOT_SQ_FT" IS NULL THEN 0
+		WHEN FINAL."lease_created_at" IS NULL OR FINAL_AUX."LEASES_COUNT" = 0 THEN 0 
+		WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN ("UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") / SQ_FT_TEMP."TOT_SQ_FT" * 100
+		ELSE NULL 
+	END AS  "OCC Pct of Property_fix",
+*/
+CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 OR FINAL."lease_created_at" IS NOT NULL THEN 0 
+		ELSE FINAL."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
+	END AS "VAC Pct of Property",
+CASE	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 or SQ_FT_TEMP."TOT_SQ_FT" IS NULL THEN 0 -- UNIT WITHOUT SQ FT
 		WHEN FINAL_AUX."LEASES_COUNT" > 0 or FINAL."lease_created_at" IS NOT NULL THEN 0 -- con leases
 		WHEN FINAL."lease_created_at" IS NULL OR FINAL_AUX."LEASES_COUNT" = 0 THEN  FINAL."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 -- sin lease
 		ELSE NULL 
-	END) AS  "VAC Pct of Property_fix"
+	END AS  "VAC Pct of Property_fix",
+
+FINAL."LEASE_NAME",
+FINAL."SQ_FT_TYPE",
+FINAL."UNIT_CLASS" "UNIT_CLASS" 
 
 FROM FINAL
 LEFT JOIN SQ_FT_TEMP
@@ -146,11 +188,4 @@ where  	FINAL."PROP_NAME" IN (@Property_Name)
 		AND FINAL."UNIT_CLASS" IN (@Unit_Class)
 		--AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 
-GROUP BY FINAL."PROP_NAME", FINAL."PROP_ID"
-order by FINAL."PROP_NAME"
-)
-
-SELECT FINAL_GROUP.*, SQ_FT_TEMP."TOT_SQ_FT" AS "TOT_SQ_FT" 
-FROM FINAL_GROUP
-INNER JOIN SQ_FT_TEMP
-	ON FINAL_GROUP."PROP_NAME" = SQ_FT_TEMP."PROP_NAME"
+order by "PROP_NAME", FINAL."UNIT_NAME"

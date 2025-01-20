@@ -135,8 +135,8 @@ FINAL AS (
   				END AS "OTHER_CHARGE" 
   
 	FROM "public"."leases"
-	INNER  JOIN "public"."leases_units_units" ON "public"."leases"."id"="public"."leases_units_units"."leasesId"
-	INNER  JOIN "public"."units" ON "public"."units"."id"="public"."leases_units_units"."unitsId"
+	INNER  JOIN "public"."lease_units" ON "public"."leases"."id"="public"."lease_units"."lease_id"
+	INNER  JOIN "public"."units" ON "public"."units"."id"="public"."lease_units"."unit_id"
 	INNER  JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
 	INNER  JOIN "public"."properties" ON "public"."units"."property_id"="public"."properties"."id"
 	LEFT JOIN CHARGES ON "public"."leases"."id" = CHARGES."LEASE_ID"
@@ -155,13 +155,14 @@ FINAL AS (
 	--GROUP BY 1,2,3,4,5,6,7
 
 	ORDER BY 7,2
-)
+),
+FINAL2 AS (
 SELECT "LEASE_NAME",
 	"LEASE_END",
-	"units_name",
-	"total_square_footage",
 	"TENANT_NAME",
 	"properties_name",
+	SUM("total_square_footage") "total_square_footage",
+	string_agg("units_name", ', ') "units_name",
 	SUM("RENT_CHARGE") AS "RENT_CHARGE",
 	SUM("ELEC_CHARGE") "ELEC_CHARGE",
 	SUM("RETax_CHARGE") "RETax_CHARGE",
@@ -173,9 +174,29 @@ FROM FINAL
 
 GROUP BY "LEASE_NAME",
 	"LEASE_END",
-	"units_name",
-	"total_square_footage",
 	"TENANT_NAME",
+	"properties_name"
+
+ORDER BY "properties_name", "LEASE_NAME"
+)
+
+SELECT "LEASE_NAME",
+	"LEASE_END",
+	"properties_name",
+	SUM("total_square_footage") "total_square_footage",
+	string_agg("TENANT_NAME", ', ') "TENANT_NAME",
+	string_agg("units_name", ', ') "units_name",
+	SUM("RENT_CHARGE") AS "RENT_CHARGE",
+	SUM("ELEC_CHARGE") "ELEC_CHARGE",
+	SUM("RETax_CHARGE") "RETax_CHARGE",
+	SUM("OTHER_CHARGE") "OTHER_CHARGE",
+    SUM("TOTAL_CHARGES") AS "TOTAL_CHARGES",
+    SUM("TOTAL_CHARGES_sqft") AS "TOTAL_CHARGES_sqft"
+    
+FROM FINAL2
+
+GROUP BY "LEASE_NAME",
+	"LEASE_END",
 	"properties_name"
 
 ORDER BY "properties_name", "LEASE_NAME"

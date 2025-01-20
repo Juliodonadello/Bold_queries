@@ -23,8 +23,8 @@ SELECT
 "public"."tenants"."phone"  AS "tenant_phone"
 
 FROM "public"."leases" 
-INNER JOIN "public"."leases_units_units" ON "public"."leases"."id"="public"."leases_units_units"."leasesId" 
-INNER JOIN "public"."units" ON "public"."leases_units_units"."unitsId"="public"."units"."id"
+INNER JOIN "public"."lease_units" ON "public"."leases"."id"="public"."lease_units"."lease_id" 
+INNER JOIN "public"."units" ON "public"."lease_units"."unit_id"="public"."units"."id"
 INNER JOIN "public"."properties" ON "public"."properties"."id"="public"."leases"."property_id"
 INNER JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
 

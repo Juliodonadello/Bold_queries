@@ -15,10 +15,10 @@ INNER JOIN "public"."properties"
 	ON "public"."leases"."property_id" = "public"."properties"."id"
 INNER JOIN "public"."tenants"
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id"
-INNER JOIN "public"."leases_units_units"
-		ON "public"."leases"."id" ="public"."leases_units_units"."leasesId"
+INNER JOIN "public"."lease_units"
+		ON "public"."leases"."id" ="public"."lease_units"."lease_id"
 INNER JOIN "public"."units"
-ON "public"."leases_units_units"."unitsId" = "public"."units"."id"
+ON "public"."lease_units"."unit_id" = "public"."units"."id"
 
 where ("public"."leases"."deleted_at" is null or "public"."leases"."deleted_at"> @ToDate)
 	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
@@ -30,4 +30,3 @@ ORDER BY "public"."properties"."company_relation_id",
 "public"."properties"."name",
 "public"."units"."name",
 "public"."tenants"."name"
-	

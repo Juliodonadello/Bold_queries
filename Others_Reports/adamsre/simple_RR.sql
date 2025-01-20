@@ -16,8 +16,8 @@ SELECT "public"."properties"."deleted_at",
 FROM "public"."properties" 
 INNER JOIN "public"."units" 
 ON "public"."properties"."id"="public"."units"."property_id" 
-LEFT OUTER JOIN "public"."leases_units_units" ON "public"."units"."id"="public"."leases_units_units"."unitsId" 
-LEFT OUTER JOIN "public"."leases" ON "public"."leases_units_units"."leasesId"="public"."leases"."id" 
+LEFT OUTER JOIN "public"."lease_units" ON "public"."units"."id"="public"."lease_units"."unit_id" 
+LEFT OUTER JOIN "public"."leases" ON "public"."lease_units"."lease_id"="public"."leases"."id" 
 LEFT OUTER JOIN "public"."tenants" ON "public"."leases"."primaryTenantId"="public"."tenants"."id" 
 
 WHERE  CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)

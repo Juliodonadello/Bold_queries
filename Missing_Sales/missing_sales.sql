@@ -13,17 +13,17 @@ WITH LEASES_SALES AS (
     SUBSTRING(TO_CHAR("public"."sales_entry"."transaction_date", 'Month'), 1, 3) AS "transaction_month",
     EXTRACT(YEAR FROM "public"."sales_entry"."transaction_date") AS "transaction_year",
     "public"."sales_entry"."sales_volume" AS "sales_volume",
-    "public"."leases_units_units"."unitsId" AS "UNIT_ID",  		
+    "public"."lease_units"."unit_id" AS "UNIT_ID",  		
     "public"."tenants"."name" AS "TENANT",
     "public"."units"."name" AS "UNIT_NAME",
     "public"."units"."total_square_footage" AS "UNIT_SQ_FT",
     "public"."properties"."name" AS "PROP_NAME"
 
   FROM "public"."leases"
-  INNER JOIN "public"."leases_units_units"
-    ON "public"."leases"."id" = "public"."leases_units_units"."leasesId"
+  INNER JOIN "public"."lease_units"
+    ON "public"."leases"."id" = "public"."lease_units"."lease_id"
   INNER JOIN "public"."units"
-    ON "public"."units"."id" = "public"."leases_units_units"."unitsId"
+    ON "public"."units"."id" = "public"."lease_units"."unit_id"
   INNER JOIN "public"."properties"
     ON "public"."properties"."id" = "public"."leases"."property_id"
   INNER JOIN "public"."rent_percentages"

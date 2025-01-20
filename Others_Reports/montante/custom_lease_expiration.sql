@@ -108,8 +108,8 @@ SQ_FT_TEMP AS
 	"public"."leases"."status",
 	"public"."leases"."start",
 	"public"."leases"."end",
-	"public"."leases_units_units"."leasesId",
-	"public"."leases_units_units"."unitsId",
+	"public"."lease_units"."lease_id",
+	"public"."lease_units"."unit_id",
 	"public"."units"."id" AS "units_id",
 	"public"."units"."name" AS "units_name",
 	"public"."units"."city",
@@ -124,8 +124,8 @@ SQ_FT_TEMP AS
 
 
 FROM "public"."leases"
-INNER  JOIN "public"."leases_units_units" ON "public"."leases"."id"="public"."leases_units_units"."leasesId"
-INNER  JOIN "public"."units" ON "public"."units"."id"="public"."leases_units_units"."unitsId"
+INNER  JOIN "public"."lease_units" ON "public"."leases"."id"="public"."lease_units"."lease_id"
+INNER  JOIN "public"."units" ON "public"."units"."id"="public"."lease_units"."unit_id"
 INNER  JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
 INNER  JOIN "public"."properties" ON "public"."units"."property_id"="public"."properties"."id"
 INNER JOIN SQ_FT_TEMP ON "public"."properties"."id" = SQ_FT_TEMP."PROP_ID"
