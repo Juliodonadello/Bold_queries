@@ -21,7 +21,7 @@ WITH LEASES AS (
 		--("public"."leases"."end" < @AsOfDate OR  "public"."leases"."end" IS NULL)
 		--AND "public"."leases"."status" != 'current'
 		--AND 
-		("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
+  		("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
   	
   GROUP BY
   		"public"."leases"."id",
@@ -52,7 +52,6 @@ SQ_FT_TEMP AS (
 	WHERE "public"."units"."deleted_at" IS NULL
   		AND "public"."properties"."deleted_at" IS NULL
 		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-		AND "public"."units"."status" = 'active'
 		
 	GROUP BY  "public"."properties"."id" 
 	),
@@ -78,7 +77,6 @@ UNITS AS (
   	WHERE "public"."properties"."deleted_at" IS NULL
 		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-		AND "public"."units"."status" = 'active'
   		
 	GROUP BY 
 		1,2,3,4,5,6,7
@@ -117,7 +115,7 @@ FINAL_AUX AS (
     GROUP BY "UNIT_ID"
 ),
 FINAL_GROUP AS (
-FINAL."PROP_ID",
+SELECT FINAL."PROP_ID",
 FINAL."PROP_NAME",
 COUNT(FINAL."UNIT_ID") "Q_UNITS",
 SUM( CASE WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN  FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" ELSE FINAL."UNIT_SQ_FT" END) AS  "UNIT_SQ_FT_fix",
@@ -150,8 +148,8 @@ where  	FINAL."PROP_NAME" IN (@Property_Name)
 GROUP BY FINAL."PROP_NAME", FINAL."PROP_ID"
 order by FINAL."PROP_NAME"
 )
-
-SELECT FINAL_GROUP.*, SQ_FT_TEMP."TOT_SQ_FT" AS "TOT_SQ_FT" 
+SELECT FINAL_GROUP.*,
+SQ_FT_TEMP."TOT_SQ_FT" 
 FROM FINAL_GROUP
 INNER JOIN SQ_FT_TEMP
-	ON FINAL_GROUP."PROP_NAME" = SQ_FT_TEMP."PROP_NAME"
+	ON FINAL_GROUP."PROP_ID" = SQ_FT_TEMP."PROP_ID"

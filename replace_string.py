@@ -1,7 +1,7 @@
 import os
 
 # Variables
-folder_path = 'c:/Users/julio/OneDrive/Documents/Sage/repos/Bold_queries/'
+folder_path = 'c:/Users/julio/OneDrive/Documents/Sage/repos/Bold_queries/Others_Reports/GreenHawk'
 search_string = ['"public"."leases_units_units"', '"public"."lease_units"."unitsId"', '"public"."lease_units"."leasesId"']
 replace_string = ['"public"."lease_units"', '"public"."lease_units"."unit_id"', '"public"."lease_units"."lease_id"']
 
