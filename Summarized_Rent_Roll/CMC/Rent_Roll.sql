@@ -15,8 +15,10 @@ WITH CHARGE_CONTROL AS (
 	),
 CHARGES_TOT AS (
   SELECT 
-		MAX("recurring_charge_id") AS "RCHARGE_ID",
+		"recurring_charge_id" AS "RCHARGE_ID",
   		"public"."lease_recurring_charges"."lease_id" AS "LEASE_ID",
+  		--old --CASE WHEN "public"."lease_recurring_charges"."order_entry_item_id" LIKE '%RENT%' OR  "public"."lease_recurring_charges"."order_entry_item_id" LIKE '%Rent%' THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "RENT_CHARGE",
+		--old --CASE WHEN "public"."lease_recurring_charges"."order_entry_item_id"  NOT LIKE '%RENT%' AND "public"."lease_recurring_charges"."order_entry_item_id"  NOT LIKE '%Rent%'  THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "OTHER_CHARGE",
 		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "RENT_CHARGE",
   		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 0 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END AS "OTHER_CHARGE",
   		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
@@ -42,11 +44,6 @@ CHARGES_TOT AS (
 		"public"."lease_recurring_charge_amounts"."deleted_at" IS NULL
 		)
 	AND (
-		"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
-		OR
-		"public"."lease_recurring_charges"."deleted_at" IS NULL
-		)
-	AND (
 		"public"."lease_recurring_charge_amounts"."frequency" != 'One Time' --not a one time charge
 		OR
 		(
@@ -60,18 +57,6 @@ CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."terminate_date" is NULL 
 		)
-	AND (	
-	  	"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
-		OR
-		"public"."lease_recurring_charges"."deleted_at" is NULL 
-		)
-	
-	GROUP BY "public"."lease_recurring_charges"."lease_id" ,
-		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END,
-  		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 0 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END,
-  		"public"."lease_recurring_charge_amounts"."effective_date",
-  		"public"."units"."property_id",
-  		"public"."lease_recurring_charges"."unit_id"
 	),
 MAX_CHARGES AS (
  	SELECT  "RCHARGE_ID" "RCHARGE_ID",
@@ -140,8 +125,8 @@ LEASES_CHARGES AS (
   	LEASES."LEASE_ID",
 	LEASES."UNIT_ID",
 	MIN(LEASES."lease_created_at") "lease_created_at", --because of difference in seconds, can't be grouped
-  	MIN(LEASES."start") "start",  
-	MAX(LEASES."lease_end") "lease_end", --because of difference in seconds, can't be grouped -- esta mal tomar max si justo se pisan dos leases
+  	MIN(LEASES."start") "start",
+	MAX(LEASES."lease_end") "lease_end", --because of difference in seconds, can't be grouped
   	LEASES."TENANT",
   	COALESCE(MAX(CASE WHEN LEASES."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' END), MAX(LEASES."LEASE_STATUS")) AS "LEASE_STATUS",
   	COALESCE(MAX(CASE WHEN LEASES."DEPOSIT" = 'YES' THEN 'YES' END), MAX(LEASES."DEPOSIT")) AS "DEPOSIT",

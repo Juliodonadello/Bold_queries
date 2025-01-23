@@ -26,7 +26,7 @@ WHERE CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COM
   AND "public"."properties"."name" IN (@Property_Name)
   and ("public"."lease_options"."expiration_date" > @FromDate and "public"."lease_options"."expiration_date" < @ToDate)
   --AND "public"."leases"."status" = 'current'
-  AND CAST("public"."leases"."status" AS TEXT) IN (CAST(@Lease_Status AS TEXT)) --Reatrieving operator error. Fix: Implementing a filter over the table layout using the parameter values
+  AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status) --Reatrieving operator error. Fix: Implementing a filter over the table layout using the parameter values
   
  GROUP BY "public"."lease_options"."id",
        "public"."lease_options"."lease_category",

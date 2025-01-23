@@ -180,44 +180,34 @@ SQ_FT_TEMP AS (
 	),
 UNITS AS (
   SELECT 
-    "public"."properties"."id" AS "PROP_ID",
-    "public"."properties"."name" AS "PROP_NAME",
-    "public"."units"."id" AS "UNIT_ID",
-    "public"."units"."name" AS "UNIT_NAME",
-    MAX(COALESCE(uq."value", "public"."units"."total_square_footage")) AS "UNIT_SQ_FT"
+		"public"."properties"."id" AS "PROP_ID",
+		"public"."properties"."name" AS "PROP_NAME",
+		"public"."units"."id" AS "UNIT_ID",
+  		"public"."units"."name" AS "UNIT_NAME",
+		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT"
+  		
+	FROM   "public"."units"
+	INNER JOIN "public"."properties"
+		ON "public"."units"."property_id" = "public"."properties"."id"
+	
+  	WHERE "public"."properties"."name" IN (@Property_Name)
+		AND "public"."properties"."company_relation_id" = @REAL_COMPANY_ID
+		AND CAST("public"."properties"."property_type" AS TEXT) IN (@Property_Type)
+		AND CAST("public"."properties"."department" AS TEXT) IN (@Department)
+		
+  		AND "public"."properties"."deleted_at" IS NULL
+		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+		AND "public"."units"."name" NOT LIKE '%INACTIVE%'
+		AND "public"."units"."name" NOT LIKE '%inactive%'
+		AND "public"."units"."name" NOT LIKE '%Inactive%'
+			
   
-  FROM "public"."units"
-  INNER JOIN "public"."properties"
-    ON "public"."units"."property_id" = "public"."properties"."id"
-  
-  LEFT JOIN (
-    SELECT DISTINCT ON ("unit_id") 
-      "unit_id",
-      "value",
-      "as_of_date"
-    FROM "public"."unit_square_footage_items"
-    WHERE "square_footage_type" = 'Total'
-      AND "as_of_date" <= @AsOfDate
-    ORDER BY "unit_id", "as_of_date" DESC
-  ) AS uq
-    ON uq."unit_id" = "public"."units"."id"
-  
-  WHERE "public"."properties"."deleted_at" IS NULL
-    AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-    AND "public"."properties"."name" IN (@Property_Name)
-    AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-	AND CAST("public"."properties"."property_type" AS TEXT) IN (@Property_Type)
-	AND CAST("public"."properties"."department" AS TEXT) IN (@Department)
-	AND "public"."units"."name" NOT LIKE '%INACTIVE%'
-	AND "public"."units"."name" NOT LIKE '%inactive%'
-	AND "public"."units"."name" NOT LIKE '%Inactive%'
-  
-  GROUP BY 
-    "public"."properties"."id",
-    "public"."properties"."name",
-    "public"."units"."id",
-    "public"."units"."name"
-),
+	GROUP BY 
+		"public"."properties"."id",
+		"public"."properties"."name",
+		"public"."units"."id",
+  		"public"."units"."name"
+	),
 FINAL AS (
 	select 
 		"LEASE_ID",

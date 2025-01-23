@@ -46,5 +46,4 @@ WHERE "public"."company_accounts"."company_id" = @COMPANY_ID
 	   "public"."tenants"."name",
 	   "public"."leases"."status"
   
-ORDER BY "public"."lease_options"."lease_category",
-    "public"."units"."name"
+ORDER BY "public"."lease_options"."lease_category"
