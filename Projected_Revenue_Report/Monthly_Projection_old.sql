@@ -95,13 +95,11 @@ charged_amounts_with_prev AS (
             ORDER BY ca."month"
         ) AS "AMOUNT_OLD"
     FROM charged_amounts ca
-    WHERE ca."rn" = '1'
 ),
 final_ca as (
 select charged_amounts_with_prev.*,
 CASE WHEN ( EXTRACT(MONTH FROM "month") = EXTRACT(MONTH FROM "EFFECTIVE_DATE") 
-						AND EXTRACT(YEAR FROM "month") = EXTRACT(YEAR FROM "EFFECTIVE_DATE") 
-                        AND '1' != EXTRACT(DAY FROM "EFFECTIVE_DATE") ) 
+						AND EXTRACT(YEAR FROM "month") = EXTRACT(YEAR FROM "EFFECTIVE_DATE") ) 
 			then "AMOUNT" + ( "AMOUNT_OLD" * ((EXTRACT(DAY FROM "EFFECTIVE_DATE")-1)) / 31 ) --filling proration with previous charged amount 
 			ELSE "AMOUNT"
 			END AS "PRORATED_AMOUNT"
