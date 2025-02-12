@@ -55,7 +55,7 @@ WITH CHARGES_TOT AS (
 		OR "public"."leases"."end" IS NULL
 		)
   	AND ( 
-	  "public"."lease_recurring_charges"."order_entry_item_id" = 'R. E. TAX'
+	  "public"."lease_recurring_charges"."order_entry_item_id" = 'TAX BID'
 		OR "public"."lease_recurring_charges"."order_entry_item_id" = 'TAX BID' )
 ),
 SECOND_AUX AS (
@@ -85,7 +85,7 @@ RECOVERY as (
 "public"."lease_recovery_control"."calculation_control_base_amount",
 "public"."recovery_control_expense_category"."expense_category",
 "public"."recovery_control_expense_category"."manual_percent",
-"public"."lease_recovery_control"."recovery_from" AS "formatted_date",
+"public"."lease_recovery_control"."recovery_from" AS "recovery_from",
 "public"."lease_recovery_control"."recovery_to" AS "recovery_to"
 
 FROM "public"."lease_recovery_control" 
@@ -97,20 +97,21 @@ INNER JOIN "public"."lease_recurring_charges"
 RECOVERY_FINAL AS (
   select
     "LEASE_ID",
-    MAX(CASE WHEN "NAME" = 'R. E. TAX' THEN "process_recovery_month_frequency" END) AS "RETAX_process_frequency",
-    MAX(CASE WHEN "NAME" = 'R. E. TAX' THEN "calculation_control_base_year" END) AS "RETAX_base_year",
-    MAX(CASE WHEN "NAME" = 'R. E. TAX' THEN "calculation_control_base_amount" END) AS "RETAX_base_amount",
-    MAX(CASE WHEN "NAME" = 'R. E. TAX' THEN "manual_percent" END) AS "RETAX_manual_percent",
-  	MAX(CASE WHEN "NAME" = 'R. E. TAX' THEN "formatted_date" END) AS "RETAX_formatted_date",
-    
+    MAX(CASE WHEN "NAME" = 'TAX BID' THEN "process_recovery_month_frequency" END) AS "RETAX_process_frequency",
+    MAX(CASE WHEN "NAME" = 'TAX BID' THEN "calculation_control_base_year" END) AS "RETAX_base_year",
+    MAX(CASE WHEN "NAME" = 'TAX BID' THEN "calculation_control_base_amount" END) AS "RETAX_base_amount",
+    MAX(CASE WHEN "NAME" = 'TAX BID' THEN "manual_percent" END) AS "RETAX_manual_percent",
+  	MAX(CASE WHEN "NAME" = 'TAX BID' THEN "recovery_from" END) AS "RETAX_recovery_from",
+	MAX(CASE WHEN "NAME" = 'TAX BID' THEN "recovery_to" END) AS "RETAX_recovery_to"
+    /*
     MAX(CASE WHEN "NAME" = 'TAX BID' THEN "process_recovery_month_frequency" END) AS "TAXBID_process_frequency",
     MAX(CASE WHEN "NAME" = 'TAX BID' THEN "calculation_control_base_year" END) AS "TAXBID_base_year",
     MAX(CASE WHEN "NAME" = 'TAX BID' THEN "calculation_control_base_amount" END) AS "TAXBID_base_amount",
     MAX(CASE WHEN "NAME" = 'TAX BID' THEN "manual_percent" END) AS "TAXBID_manual_percent",
   	MAX(CASE WHEN "NAME" = 'TAX BID' THEN "formatted_date" END) AS "TAXBID_formatted_date"
-  
-FROM RECOVERY
-GROUP BY 1
+	*/
+	FROM RECOVERY
+	GROUP BY 1
 )
 
 SELECT 
@@ -118,32 +119,36 @@ SELECT
   	SECOND_AUX."UNIT_NAME",
     SECOND_AUX."LEASE_ID",
 	SECOND_AUX."LEASE_NAME",
+	SECOND_AUX."ITEM_ID",
+	"public"."tenants"."name" AS "tenant_name",
 	
-   	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'R. E. TAX' AND SECOND_AUX."ROW_NUM" = 1 THEN SECOND_AUX."AMOUNT" END) AS "RETAX_amount_new",
-    MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'R. E. TAX' AND SECOND_AUX."ROW_NUM" = 2 THEN SECOND_AUX."AMOUNT" END) AS "RETAX_amount_old",
-	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'R. E. TAX' THEN RECOVERY_FINAL."RETAX_formatted_date" END) AS "RETAX_formatted_date",
-	
+   	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' AND SECOND_AUX."ROW_NUM" = 1 THEN SECOND_AUX."AMOUNT" END) AS "RETAX_amount_new",
+    MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' AND SECOND_AUX."ROW_NUM" = 2 THEN SECOND_AUX."AMOUNT" END) AS "RETAX_amount_old",
+	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' THEN RECOVERY_FINAL."RETAX_recovery_from" END) AS "RETAX_recovery_from",
+	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' THEN RECOVERY_FINAL."RETAX_recovery_to" END) AS "RETAX_recovery_to",
+	/*
     MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' AND SECOND_AUX."ROW_NUM" = 1 THEN SECOND_AUX."AMOUNT" END) AS "TAXBID_amount_new",
     MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' AND SECOND_AUX."ROW_NUM" = 2 THEN SECOND_AUX."AMOUNT" END) AS "TAXBID_amount_old",
 	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' THEN RECOVERY_FINAL."TAXBID_formatted_date" END) AS "TAXBID_formatted_date",
-	
+	*/
 	MAX(RECOVERY_FINAL."RETAX_process_frequency") "RETAX_process_frequency",
 	MAX(RECOVERY_FINAL."RETAX_base_year") "RETAX_base_year",
 	MAX(RECOVERY_FINAL."RETAX_base_amount") "RETAX_base_amount",
-	MAX(RECOVERY_FINAL."RETAX_manual_percent") "RETAX_manual_percent",
-	
-    
+	MAX(RECOVERY_FINAL."RETAX_manual_percent") "RETAX_manual_percent"
+	/*
     MAX(RECOVERY_FINAL."TAXBID_process_frequency") "TAXBID_process_frequency",
     MAX(RECOVERY_FINAL."TAXBID_base_year") "TAXBID_base_year",
     MAX(RECOVERY_FINAL."TAXBID_base_amount") "TAXBID_base_amount",
 	MAX(RECOVERY_FINAL."TAXBID_manual_percent") "TAXBID_manual_percent"
-	
+	*/
 FROM SECOND_AUX
 LEFT JOIN RECOVERY_FINAL
 	ON RECOVERY_FINAL."LEASE_ID" = SECOND_AUX."LEASE_ID"
-WHERE "ROW_NUM" <= 2
-GROUP BY 
-    SECOND_AUX."PROP_NAME", 
-  	SECOND_AUX."UNIT_NAME",
-    SECOND_AUX."LEASE_ID",
-	SECOND_AUX."LEASE_NAME"
+INNER JOIN "public"."leases"
+	ON "public"."leases"."id" = SECOND_AUX."LEASE_ID"
+INNER JOIN "public"."tenants"
+	ON "public"."leases"."primaryTenantId"="public"."tenants"."id"
+
+WHERE "ROW_NUM" <= 2 and SECOND_AUX."ITEM_ID" = 'TAX BID'
+GROUP BY
+    1,2,3,4,5,6

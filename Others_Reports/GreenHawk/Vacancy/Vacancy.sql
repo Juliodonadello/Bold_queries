@@ -4,8 +4,14 @@ WITH LEASES AS (
 		"public"."leases"."created_at" AS "lease_created_at",
   		"public"."leases"."start" AS "start",
 		"public"."leases"."end" AS "lease_end",
-  		"public"."leases"."status" AS "original_lease_status",
-		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END AS "LEASE_STATUS",
+  		CASE WHEN "public"."leases"."status" = 'current' THEN 'CURRENT' 
+  				 WHEN "public"."leases"."status" = 'future' THEN 'FUTURE' 
+  		ELSE 'NONE'
+  		END AS "original_lease_status",
+		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' 
+  				 WHEN "public"."leases"."status" = 'future' THEN 'VACANT' 
+  		ELSE 'VACANT'
+  		END AS "LEASE_STATUS",
 		"public"."tenants"."name"  as "TENANT",
 		"public"."leases"."name" AS "LEASE_NAME"
   
@@ -17,22 +23,9 @@ WITH LEASES AS (
 	LEFT OUTER JOIN "public"."tenants"
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
-	WHERE 
-		--("public"."leases"."end" < @AsOfDate OR  "public"."leases"."end" IS NULL)
-		--AND "public"."leases"."status" != 'current'
-		--AND 
-		("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
+	WHERE ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
   	
-  GROUP BY
-  		"public"."leases"."id",
-		"public"."lease_units"."unit_id",
-		"public"."leases"."created_at",
-  		"public"."leases"."start",
-		"public"."leases"."end",
-  		"public"."leases"."status",
-		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END,
-		"public"."tenants"."name",
-		"public"."leases"."name"
+  GROUP BY 1,2,3,4,5,6,7,8,9
 	),
 SQ_FT_TEMP AS (
 	SELECT
@@ -96,15 +89,14 @@ FINAL AS (
 		"start",
 		"lease_end",
 		"TENANT",
-		"LEASE_STATUS",
-  		"original_lease_status",
+  		--CASE WHEN "LEASE_STATUS" IS NULL THEN 'VACANT' ELSE "LEASE_STATUS" END AS "LEASE_STATUS",
+  		CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS",
+  		CASE WHEN "original_lease_status" IS NULL THEN 'NONE' ELSE "original_lease_status" END AS "original_lease_status",
 		"LEASE_NAME"
 	
   from UNITS
   left join LEASES
   	ON UNITS."UNIT_ID" = LEASES."UNIT_ID"
-  
-  where LEASES."original_lease_status" is null or LEASES."original_lease_status"!= 'current'
 ),
 FINAL_AUX AS (
     -- prop SQ FT fix when having 2 or more leases for the same unit
@@ -120,9 +112,8 @@ FINAL."PROP_ID",
 FINAL."PROP_NAME",
 FINAL."UNIT_ID",
 FINAL."UNIT_NAME" "UNIT_NAME" ,
---CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS",
-CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN 'OCCUPIED' ELSE 'VACANT' END AS  "LEASE_STATUS", -- esto se hizo porque los status future se deben ver como Occupied si el asofdate coincide
-FINAL."original_lease_status",
+FINAL."LEASE_STATUS" AS  "LEASE_STATUS",
+FINAL."original_lease_status" AS  "original_lease_status",
 FINAL."TENANT",
 FINAL."lease_created_at" "lease_created_at",
 FINAL."start" "lease_start",
@@ -131,16 +122,16 @@ CASE 	WHEN FINAL."EFF_UNIT_SQ_FT" IS NULL THEN FINAL."UNIT_SQ_FT"
 			ELSE FINAL."EFF_UNIT_SQ_FT"
 END AS "UNIT_SQ_FT",
 CASE WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN  FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" ELSE FINAL."UNIT_SQ_FT" END AS  "UNIT_SQ_FT_fix",
-/*
-CASE WHEN FINAL."lease_created_at" IS NOT NULL THEN UNITS."UNIT_SQ_FT" ELSE NULL END AS  "OCCUPIED_UNIT_SQ_FT",
-CASE WHEN FINAL."lease_created_at" IS NOT NULL AND FINAL_AUX."LEASES_COUNT" > 0 THEN UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
-		 WHEN FINAL."lease_created_at" IS NOT NULL THEN UNITS."UNIT_SQ_FT"
+
+CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN FINAL."UNIT_SQ_FT" ELSE NULL END AS  "OCCUPIED_UNIT_SQ_FT",
+CASE WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' AND FINAL_AUX."LEASES_COUNT" > 0 THEN FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
+		 WHEN FINAL."LEASE_STATUS" = 'OCCUPIED' THEN FINAL."UNIT_SQ_FT"
 		ELSE NULL 
 	END AS  "OCCUPIED_UNIT_SQ_FT_fix",
-*/
-CASE WHEN FINAL."lease_created_at" IS NULL THEN FINAL."UNIT_SQ_FT" ELSE NULL END AS  "VACCANT_UNIT_SQ_FT",
-CASE WHEN FINAL."lease_created_at" IS NULL AND FINAL_AUX."LEASES_COUNT" > 0 THEN FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
-		 WHEN FINAL."lease_created_at" IS NULL THEN FINAL."UNIT_SQ_FT"
+
+CASE WHEN FINAL."LEASE_STATUS" = 'VACANT' THEN FINAL."UNIT_SQ_FT" ELSE NULL END AS  "VACCANT_UNIT_SQ_FT",
+CASE WHEN FINAL."LEASE_STATUS" = 'VACANT' AND FINAL_AUX."LEASES_COUNT" > 0 THEN FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
+		 WHEN FINAL."LEASE_STATUS" = 'VACANT' THEN FINAL."UNIT_SQ_FT"
 		ELSE NULL 
 	END AS  "VACCANT_UNIT_SQ_FT_fix",
 
@@ -153,23 +144,23 @@ CASE	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 or SQ_FT_TEMP."TOT_SQ_FT" IS NULL THEN 0
 		ELSE NULL 
 	END AS  "Pct of Property_fix",
 
-/*
 CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 THEN 0 
-		WHEN FINAL."lease_created_at" IS NULL THEN 0 
-		ELSE UNITS."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
+		WHEN FINAL."LEASE_STATUS" = 'VACANT' THEN 0 
+		ELSE FINAL."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
 	END AS "OCC Pct of Property",
 CASE	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 or SQ_FT_TEMP."TOT_SQ_FT" IS NULL THEN 0
-		WHEN FINAL."lease_created_at" IS NULL OR FINAL_AUX."LEASES_COUNT" = 0 THEN 0 
-		WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN ("UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") / SQ_FT_TEMP."TOT_SQ_FT" * 100
+		WHEN FINAL."LEASE_STATUS" = 'VACANT' OR FINAL_AUX."LEASES_COUNT" = 0 THEN 0 
+		WHEN FINAL_AUX."LEASES_COUNT" > 0 THEN (FINAL."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") / SQ_FT_TEMP."TOT_SQ_FT" * 100
 		ELSE NULL 
 	END AS  "OCC Pct of Property_fix",
-*/
-CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 OR FINAL."lease_created_at" IS NOT NULL THEN 0 
+
+CASE 	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 OR FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 0 
 		ELSE FINAL."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 
 	END AS "VAC Pct of Property",
 CASE	WHEN SQ_FT_TEMP."TOT_SQ_FT" = 0 or SQ_FT_TEMP."TOT_SQ_FT" IS NULL THEN 0 -- UNIT WITHOUT SQ FT
-		WHEN FINAL_AUX."LEASES_COUNT" > 0 or FINAL."lease_created_at" IS NOT NULL THEN 0 -- con leases
-		WHEN FINAL."lease_created_at" IS NULL OR FINAL_AUX."LEASES_COUNT" = 0 THEN  FINAL."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 -- sin lease
+		WHEN FINAL_AUX."LEASES_COUNT" > 0 or FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 0 -- con leases future
+		WHEN FINAL_AUX."LEASES_COUNT" > 0 or FINAL."LEASE_STATUS" = 'OCCUPIED' THEN 0 -- con leases
+		WHEN FINAL."LEASE_STATUS" = 'VACANT' OR FINAL_AUX."LEASES_COUNT" = 0 THEN  FINAL."UNIT_SQ_FT" / SQ_FT_TEMP."TOT_SQ_FT" * 100 -- sin lease
 		ELSE NULL 
 	END AS  "VAC Pct of Property_fix",
 

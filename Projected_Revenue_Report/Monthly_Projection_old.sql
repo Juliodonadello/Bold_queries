@@ -40,6 +40,7 @@ charged_amounts AS (
         ds."month",
         ct."LEASE_ID",
         ct."EFFECTIVE_DATE",
+  		ct."AMOUNT" as "AMOUNT_OLD",
   		-- proration in lease end calculation
   		CASE 
   				WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12
@@ -95,12 +96,19 @@ charged_amounts_with_prev AS (
             ORDER BY ca."month"
         ) AS "AMOUNT_OLD"
     FROM charged_amounts ca
+    WHERE ca."rn" = '1'
 ),
 final_ca as (
 select charged_amounts_with_prev.*,
 CASE WHEN ( EXTRACT(MONTH FROM "month") = EXTRACT(MONTH FROM "EFFECTIVE_DATE") 
-						AND EXTRACT(YEAR FROM "month") = EXTRACT(YEAR FROM "EFFECTIVE_DATE") ) 
-			then "AMOUNT" + ( "AMOUNT_OLD" * ((EXTRACT(DAY FROM "EFFECTIVE_DATE")-1)) / 31 ) --filling proration with previous charged amount 
+						AND EXTRACT(YEAR FROM "month") = EXTRACT(YEAR FROM "EFFECTIVE_DATE") 
+                        AND '1' != EXTRACT(DAY FROM "EFFECTIVE_DATE")
+  						AND ("AMOUNT_OLD" IS NULL) ) 
+			then  "AMOUNT" --( "AMOUNT" * ((EXTRACT(DAY FROM "EFFECTIVE_DATE")-1)) / 31 ) 								-- proration for first effective date in the charge 
+  		 WHEN ( EXTRACT(MONTH FROM "month") = EXTRACT(MONTH FROM "EFFECTIVE_DATE") 
+						AND EXTRACT(YEAR FROM "month") = EXTRACT(YEAR FROM "EFFECTIVE_DATE") 
+                        AND '1' != EXTRACT(DAY FROM "EFFECTIVE_DATE") ) 
+			then "AMOUNT" + ( "AMOUNT_OLD" * ((EXTRACT(DAY FROM "EFFECTIVE_DATE")-1)) / 31 ) -- filling proration with previous charged amount 
 			ELSE "AMOUNT"
 			END AS "PRORATED_AMOUNT"
 from charged_amounts_with_prev

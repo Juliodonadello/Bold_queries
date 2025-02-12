@@ -40,6 +40,7 @@ charged_amounts AS (
         ds."month",
         ct."LEASE_ID",
         ct."EFFECTIVE_DATE",
+  		ct."AMOUNT" as "AMOUNT_OLD",
   		-- proration in lease end calculation
   		CASE 
   				WHEN ct."FREQUENCY" = 'Annually' THEN ct."AMOUNT" / 12
@@ -79,6 +80,23 @@ q_units_aux as (
   	FROM charged_amounts
   group by 1,2,3,4,5,6
 ),
+compact_units_aux AS (
+    SELECT
+        ca."month",
+        ca."LEASE_ID",
+        ca."EFFECTIVE_DATE",
+        ca."ITEM_ID",
+        ca."PROP_ID",
+		ca."LEASE_END",
+        --ct."UNIT_ID",
+		MIN(ca."rn") AS "rn",
+		SUM(ca."AMOUNT_OLD") AS "AMOUNT_OLD",
+		SUM(ca."AMOUNT") AS "AMOUNT"
+  		
+	FROM charged_amounts AS ca
+	GROUP BY 1,2,3,4,5,6
+	
+), 
 charged_amounts_with_prev AS (
     SELECT
         ca."month",
@@ -86,23 +104,27 @@ charged_amounts_with_prev AS (
         ca."EFFECTIVE_DATE",
         ca."ITEM_ID",
         ca."PROP_ID",
-        ca."UNIT_ID",
         ca."LEASE_END",
   		ca."rn",
         ca."AMOUNT",
         LAG(ca."AMOUNT") OVER (
-            PARTITION BY ca."LEASE_ID", ca."ITEM_ID", ca."UNIT_ID" 
+            PARTITION BY ca."LEASE_ID", ca."ITEM_ID"
             ORDER BY ca."month"
         ) AS "AMOUNT_OLD"
-    FROM charged_amounts ca
+    FROM compact_units_aux ca
     WHERE ca."rn" = '1'
 ),
 final_ca as (
 select charged_amounts_with_prev.*,
 CASE WHEN ( EXTRACT(MONTH FROM "month") = EXTRACT(MONTH FROM "EFFECTIVE_DATE") 
 						AND EXTRACT(YEAR FROM "month") = EXTRACT(YEAR FROM "EFFECTIVE_DATE") 
+                        AND '1' != EXTRACT(DAY FROM "EFFECTIVE_DATE")
+  						AND ("AMOUNT_OLD" IS NULL) ) 
+			then  "AMOUNT" --( "AMOUNT" * ((EXTRACT(DAY FROM "EFFECTIVE_DATE")-1)) / 31 ) 								-- proration for first effective date in the charge 
+  		 WHEN ( EXTRACT(MONTH FROM "month") = EXTRACT(MONTH FROM "EFFECTIVE_DATE") 
+						AND EXTRACT(YEAR FROM "month") = EXTRACT(YEAR FROM "EFFECTIVE_DATE") 
                         AND '1' != EXTRACT(DAY FROM "EFFECTIVE_DATE") ) 
-			then "AMOUNT" + ( "AMOUNT_OLD" * ((EXTRACT(DAY FROM "EFFECTIVE_DATE")-1)) / 31 ) --filling proration with previous charged amount 
+			then "AMOUNT" + ( "AMOUNT_OLD" * ((EXTRACT(DAY FROM "EFFECTIVE_DATE")-1)) / 31 ) -- filling proration with previous charged amount 
 			ELSE "AMOUNT"
 			END AS "PRORATED_AMOUNT"
 from charged_amounts_with_prev
@@ -146,7 +168,6 @@ FINAL_TO_PIVOT AS (
   GROUP BY 1,2,3,4,6,7
     ORDER BY ca."PROP_ID", ca."LEASE_ID", ca."ITEM_ID", ds."month"
 )
-
 SELECT
     fp."ITEM_ID",
     "public"."leases"."name",
@@ -190,10 +211,12 @@ INNER JOIN "public"."leases" ON fp."LEASE_ID" = "public"."leases"."id"
 INNER JOIN "public"."tenants" ON "public"."tenants"."id" = "public"."leases"."primaryTenantId"
 INNER JOIN "public"."properties" ON fp."PROP_ID" = "public"."properties"."id"
 
-WHERE CASE WHEN CAST("public"."leases"."month_to_month" AS TEXT) ='true' THEN 'True' ELSE 'False' END IN (@month_to_month) 
-    AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
-
+WHERE  CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
+	AND CASE WHEN CAST("public"."leases"."month_to_month" AS TEXT) ='true' THEN 'True' ELSE 'False' END IN (@month_to_month) 
+	
 GROUP BY
     1, 2, 3, 4, 5, 6
 ORDER BY
     1, 2, 4
+
+
