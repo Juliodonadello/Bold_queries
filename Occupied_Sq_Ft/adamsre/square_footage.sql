@@ -242,8 +242,9 @@ FINAL_AUX AS (
     "UNIT_ID"
     FROM FINAL
     GROUP BY "UNIT_ID"
-	)
-
+	),
+	
+DATASET AS (
 SELECT 
 UNITS."PROP_ID",
 UNITS."PROP_NAME",
@@ -327,3 +328,10 @@ where  	UNITS."PROP_NAME" IN (@Property_Name)
 		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
 
 order by "PROP_NAME", UNITS."UNIT_NAME"
+ )
+ 
+ SELECT *
+ FROM DATASET
+ WHERE DATASET."UNIT_SQ_FT" = DATASET."UNIT_SQ_FT_fix"
+ 
+ 
