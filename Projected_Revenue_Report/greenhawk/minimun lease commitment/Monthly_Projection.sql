@@ -48,7 +48,9 @@ charged_amounts AS (
 				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")  
 					 		 AND 31 = EXTRACT(DAY FROM ct."LEASE_END") ) then ct."AMOUNT"
   				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
-				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 31	
+				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 31
+  				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."RCHARGE_END") 
+				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."RCHARGE_END")) then ct."AMOUNT" * EXTRACT(DAY FROM ct."RCHARGE_END") / 31
   				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
 				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")  
 					 		 AND 1 = EXTRACT(DAY FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT"
@@ -163,7 +165,7 @@ FINAL_TO_PIVOT AS (
         --        ca."UNIT_ID"
     FROM date_series ds
     LEFT JOIN charged_amounts_2 ca 
-  		ON ds."month" = ca."month" AND ca."rn" = 1
+  		ON ds."month" = ca."month" --AND ca."rn" = 1
     ORDER BY ca."PROP_ID", ca."LEASE_ID", ca."ITEM_ID", ds."month"
 )
 SELECT

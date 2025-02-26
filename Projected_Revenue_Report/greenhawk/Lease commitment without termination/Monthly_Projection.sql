@@ -41,12 +41,14 @@ charged_amounts AS (
         ct."AMOUNT" AS "AMOUNT_OLD",
         -- proration in lease end calculation
   		CASE 	
-  				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
-				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")  
-					 		 AND 1 = EXTRACT(DAY FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT"
-				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
-								 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT" * (31-EXTRACT(DAY FROM ct."EFFECTIVE_DATE")+1) / 31	 --FALTA RELLENAR CON LOS DIAS CON EL EFFECTIVE DATE ANTERIOR 
-                ELSE ct."AMOUNT" 
+            WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."RCHARGE_END") 
+                            AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."RCHARGE_END")) then ct."AMOUNT" * EXTRACT(DAY FROM ct."RCHARGE_END") / 31
+            WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
+                            AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")  
+                            AND 1 = EXTRACT(DAY FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT"
+            WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
+                                AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT" * (31-EXTRACT(DAY FROM ct."EFFECTIVE_DATE")+1) / 31	 --FALTA RELLENAR CON LOS DIAS CON EL EFFECTIVE DATE ANTERIOR 
+            ELSE ct."AMOUNT" 
   		END AS "AMOUNT",
   		--end proration in lease end
         ct."ITEM_ID",

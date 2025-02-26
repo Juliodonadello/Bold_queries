@@ -1,9 +1,24 @@
 WITH RECURSIVE date_series AS (
-    SELECT  (@From_Date::DATE - INTERVAL '1 month')::DATE as month --@From_Date::DATE as month
+    SELECT  (DATE_TRUNC('year', @AsOfDate::DATE) - INTERVAL '1 month')::DATE as month
     UNION ALL
     SELECT (month + INTERVAL '1 month')::DATE
     FROM date_series
-    WHERE month + INTERVAL '1 month' <= @To_Date::DATE
+    WHERE month + INTERVAL '1 month' <= DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '1 year' - INTERVAL '1 day'
+),
+CHARGE_CONTROL AS (
+  	SELECT 
+  			"public"."properties"."id" AS "PROP_ID",
+  			"public"."property_charge_controls"."item_id" as "ITEM_ID",
+  			CASE WHEN "public"."property_charge_controls"."base_rent" then 1 else 0 end as "BASE_RENT",
+            CASE WHEN "public"."property_charge_controls"."item_id" LIKE '%TICAM%' then 1 else 0 end as "TICAM",
+            CASE WHEN "public"."property_charge_controls"."item_id" LIKE '%TRUE UP%' then 1 else 0 end as "TRUE_UP"
+  		
+  	FROM "public"."properties"
+  	INNER JOIN "public"."property_charge_controls"
+  		ON "public"."property_charge_controls"."property_id" = "public"."properties"."id"
+  	
+  	WHERE "public"."properties"."name" IN (@Property_Name)
+	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 ),
 CHARGES_TOT AS (
     SELECT 
@@ -15,7 +30,11 @@ CHARGES_TOT AS (
         "lease_recurring_charges"."unit_id" AS "UNIT_ID",
   		"public"."leases"."end" AS "LEASE_END",
   		"lease_recurring_charge_amounts"."frequency" AS "FREQUENCY", 
-  		"lease_recurring_charges"."terminate_date" AS "RCHARGE_END"
+  		"lease_recurring_charges"."terminate_date" AS "RCHARGE_END",
+  		CHARGE_CONTROL."BASE_RENT",
+  		CHARGE_CONTROL."TICAM",
+  		CHARGE_CONTROL."TRUE_UP"
+  
   
     FROM "public"."lease_recurring_charges"
     INNER JOIN "public"."lease_recurring_charge_amounts"
@@ -26,11 +45,14 @@ CHARGES_TOT AS (
         ON "units"."property_id" =  "properties"."id"
   	INNER JOIN "public"."leases" 
   		ON "lease_recurring_charges"."lease_id" = "public"."leases"."id"
+    INNER JOIN CHARGE_CONTROL
+  		ON CHARGE_CONTROL."PROP_ID" = "public"."units"."property_id"
+  		AND CHARGE_CONTROL."ITEM_ID" = "public"."lease_recurring_charges"."order_entry_item_id"
   
-    WHERE "lease_recurring_charge_amounts"."effective_date" <= @To_Date
-        AND ("lease_recurring_charge_amounts"."deleted_at" >= @To_Date OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
-        AND ("lease_recurring_charges"."deleted_at" >= @To_Date OR "lease_recurring_charges"."deleted_at" IS NULL)
-        AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
+    WHERE "lease_recurring_charge_amounts"."effective_date" <= DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '1 year' - INTERVAL '1 day'
+        AND ("lease_recurring_charge_amounts"."deleted_at" >= DATE_TRUNC('year', @AsOfDate::DATE) OR "lease_recurring_charge_amounts"."deleted_at" IS NULL)
+        AND ("lease_recurring_charges"."deleted_at" >= DATE_TRUNC('year', @AsOfDate::DATE) OR "lease_recurring_charges"."deleted_at" IS NULL)
+        AND (CHARGE_CONTROL."BASE_RENT" = 1 OR CHARGE_CONTROL."TICAM" = 1 OR CHARGE_CONTROL."TRUE_UP" = 1)
         AND "public"."properties"."name" IN (@Property_Name)
         AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
   		AND ("lease_recurring_charge_amounts"."effective_date" <= "public"."leases"."end" OR "public"."leases"."end" is NULL)
@@ -63,7 +85,10 @@ charged_amounts AS (
         ct."PROP_ID",
         ct."UNIT_ID",
         ROW_NUMBER() OVER (PARTITION BY ct."LEASE_ID", ct."ITEM_ID", ds."month" ORDER BY ct."EFFECTIVE_DATE" DESC) AS "rn",
-  		ct."LEASE_END" 
+  		ct."LEASE_END" , 
+  		ct."BASE_RENT",
+  		ct."TICAM",
+  		ct."TRUE_UP"
     FROM
         date_series ds
     CROSS JOIN CHARGES_TOT ct
@@ -91,12 +116,15 @@ compact_units_aux AS (
         ca."PROP_ID",
 		ca."LEASE_END",
         --ct."UNIT_ID",
+  		ca."BASE_RENT",
+  		ca."TICAM",
+  		ca."TRUE_UP",
 		MIN(ca."rn") AS "rn",
 		SUM(ca."AMOUNT_OLD") AS "AMOUNT_OLD",
 		SUM(ca."AMOUNT") AS "AMOUNT"
   		
 	FROM charged_amounts AS ca
-	GROUP BY 1,2,3,4,5,6
+	GROUP BY 1,2,3,4,5,6,7,8,9
 	
 ), 
 charged_amounts_with_prev AS (
@@ -109,6 +137,9 @@ charged_amounts_with_prev AS (
         ca."LEASE_END",
   		ca."rn",
         ca."AMOUNT",
+  		ca."BASE_RENT",
+  		ca."TICAM",
+  		ca."TRUE_UP",
         LAG(ca."AMOUNT") OVER (
             PARTITION BY ca."LEASE_ID", ca."ITEM_ID"
             ORDER BY ca."month"
@@ -130,7 +161,7 @@ CASE WHEN ( EXTRACT(MONTH FROM "month") = EXTRACT(MONTH FROM "EFFECTIVE_DATE")
 			ELSE "AMOUNT"
 			END AS "PRORATED_AMOUNT"
 from charged_amounts_with_prev
-where "rn" = 1 and "month" >= @From_Date
+where "rn" = 1 and "month" >= DATE_TRUNC('year', @AsOfDate::DATE)
 ),
 charged_amounts_2 AS (
 	SELECT  charged_amounts."month",
@@ -139,6 +170,9 @@ charged_amounts_2 AS (
         charged_amounts."ITEM_ID",
         charged_amounts."PROP_ID",
   		charged_amounts."LEASE_END",
+  		charged_amounts."BASE_RENT",
+  		charged_amounts."TICAM",
+  		charged_amounts."TRUE_UP",
   		SUM(charged_amounts."AMOUNT") "AMOUNT_OLD",
   		SUM(charged_amounts."PRORATED_AMOUNT") "AMOUNT"
   		
@@ -151,7 +185,7 @@ charged_amounts_2 AS (
 			  AND q_units_aux."PROP_ID" = charged_amounts."PROP_ID"
 			  AND q_units_aux."LEASE_END" = charged_amounts."LEASE_END"
   	WHERE "rn"  <= q_units_aux."Q_UNITS"
-  	GROUP BY 1,2,3,4,5,6
+  	GROUP BY 1,2,3,4,5,6,7,8,9
   	ORDER BY 1
 ),
 FINAL_TO_PIVOT AS (
@@ -162,51 +196,53 @@ FINAL_TO_PIVOT AS (
         ca."LEASE_ID",
         SUM(COALESCE(ca."AMOUNT", 0)) AS "AMOUNT",
         ca."ITEM_ID",
-        ca."PROP_ID"
+        ca."PROP_ID",
+  		ca."BASE_RENT",
+  		ca."TICAM",
+  		ca."TRUE_UP"
         --ca."UNIT_ID"
     FROM
         date_series ds
     LEFT JOIN charged_amounts_2 ca ON ds."month" = ca."month"
-  GROUP BY 1,2,3,4,6,7
+  GROUP BY 1,2,3,4,6,7,8,9,10
     ORDER BY ca."PROP_ID", ca."LEASE_ID", ca."ITEM_ID", ds."month"
 )
 SELECT
     fp."ITEM_ID",
+  	fp."BASE_RENT",
+  	fp."TICAM",
+  	fp."TRUE_UP",
     "public"."leases"."name",
     "public"."leases"."start",
     "public"."leases"."end",
     "public"."tenants"."name" AS "tenants_name",
     "public"."properties"."name" AS "property_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '0 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 1",
-    TO_CHAR(@From_Date + INTERVAL '0 month', 'Mon, YY') AS "month_1_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '1 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 2",
-    TO_CHAR(@From_Date + INTERVAL '1 month', 'Mon, YY') AS "month_2_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '2 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 3",
-    TO_CHAR(@From_Date + INTERVAL '2 month', 'Mon, YY') AS "month_3_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '3 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 4",
-    TO_CHAR(@From_Date + INTERVAL '3 month', 'Mon, YY') AS "month_4_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '4 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 5",
-    TO_CHAR(@From_Date + INTERVAL '4 month', 'Mon, YY') AS "month_5_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '5 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 6",
-    TO_CHAR(@From_Date + INTERVAL '5 month', 'Mon, YY') AS "month_6_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '6 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 7",
-    TO_CHAR(@From_Date + INTERVAL '6 month', 'Mon, YY') AS "month_7_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '7 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 8",
-    TO_CHAR(@From_Date + INTERVAL '7 month', 'Mon, YY') AS "month_8_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '8 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 9",
-    TO_CHAR(@From_Date + INTERVAL '8 month', 'Mon, YY') AS "month_9_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '9 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 10",
-    TO_CHAR(@From_Date + INTERVAL '9 month', 'Mon, YY') AS "month_10_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '10 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 11",
-    TO_CHAR(@From_Date + INTERVAL '10 month', 'Mon, YY') AS "month_11_name",
-    SUM(CASE WHEN DATE_TRUNC('month', @From_Date + INTERVAL '11 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 12",
-    TO_CHAR(@From_Date + INTERVAL '11 month', 'Mon, YY') AS "month_12_name",
-    SUM(CASE WHEN DATE_TRUNC('year', @From_Date) = DATE_TRUNC('year', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "YEAR 1",
-    EXTRACT(YEAR FROM @From_Date) AS "year_1_name",
-    SUM(CASE WHEN DATE_TRUNC('year', @From_Date + INTERVAL '1 year') = DATE_TRUNC('year', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "YEAR 2",
-    EXTRACT(YEAR FROM @From_Date + INTERVAL '1 year') AS "year_2_name",
-    SUM(CASE WHEN DATE_TRUNC('year', @From_Date + INTERVAL '2 year') = DATE_TRUNC('year', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "YEAR 3",
-    EXTRACT(YEAR FROM @From_Date + INTERVAL '2 year') AS "year_3_name"
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '0 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 1",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '0 month', 'Mon, YY') AS "month_1_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '1 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 2",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '1 month', 'Mon, YY') AS "month_2_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '2 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 3",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '2 month', 'Mon, YY') AS "month_3_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '3 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 4",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '3 month', 'Mon, YY') AS "month_4_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '4 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 5",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '4 month', 'Mon, YY') AS "month_5_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '5 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 6",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '5 month', 'Mon, YY') AS "month_6_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '6 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 7",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '6 month', 'Mon, YY') AS "month_7_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '7 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 8",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '7 month', 'Mon, YY') AS "month_8_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '8 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 9",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '8 month', 'Mon, YY') AS "month_9_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '9 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 10",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '9 month', 'Mon, YY') AS "month_10_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '10 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 11",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '10 month', 'Mon, YY') AS "month_11_name",
+    SUM(CASE WHEN DATE_TRUNC('month', DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '11 month') = DATE_TRUNC('month', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "Month 12",
+    TO_CHAR(DATE_TRUNC('year', @AsOfDate::DATE) + INTERVAL '11 month', 'Mon, YY') AS "month_12_name",
+    SUM(CASE WHEN DATE_TRUNC('year', DATE_TRUNC('year', @AsOfDate::DATE)) = DATE_TRUNC('year', fp."TIME_STAMP") THEN fp."AMOUNT" ELSE 0 END) AS "YEAR 1",
+    EXTRACT(YEAR FROM DATE_TRUNC('year', @AsOfDate::DATE)) AS "year_1_name"
 FROM
     FINAL_TO_PIVOT as fp
 INNER JOIN "public"."leases" ON fp."LEASE_ID" = "public"."leases"."id"
@@ -214,10 +250,9 @@ INNER JOIN "public"."tenants" ON "public"."tenants"."id" = "public"."leases"."pr
 INNER JOIN "public"."properties" ON fp."PROP_ID" = "public"."properties"."id"
 
 WHERE  CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
-	AND CASE WHEN CAST("public"."leases"."month_to_month" AS TEXT) ='true' THEN 'True' ELSE 'False' END IN (@month_to_month) 
-	
+	AND "public"."leases"."name" = 'PCY13-2030KIEW' --'PCY01-2049ABC'
 GROUP BY
-    1, 2, 3, 4, 5, 6
+    1, 2, 3, 4, 5, 6, 7, 8, 9
 ORDER BY
     1, 2, 4
 

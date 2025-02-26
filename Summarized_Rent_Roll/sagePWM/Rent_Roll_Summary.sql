@@ -20,7 +20,7 @@ CHARGES_TOT AS (
   		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
   		"public"."units"."property_id" "PROP_ID",
   		"public"."lease_recurring_charges"."unit_id" "UNIT_ID",
-  		"public"."lease_recurring_charge_amounts"."frequency" "FREQUENCY"
+		"public"."lease_recurring_charge_amounts"."frequency" "FREQUENCY"
   
 	FROM "public"."lease_recurring_charges"
 	LEFT OUTER JOIN "public"."lease_recurring_charge_amounts"
@@ -56,7 +56,7 @@ CHARGES_TOT AS (
 		OR
 		"public"."lease_recurring_charges"."terminate_date" is NULL 
 		)
-	
+		
 	GROUP BY 
 		"public"."lease_recurring_charges"."lease_id",
 		CASE WHEN CHARGE_CONTROL. "BASE_RENT" = 1 THEN "public"."lease_recurring_charge_amounts"."amount" ELSE 0 END ,
@@ -94,7 +94,9 @@ LEASES AS (
 		"public"."leases"."created_at" AS "lease_created_at",
   		"public"."leases"."start" AS "start",
 		"public"."leases"."end" AS "lease_end",
-		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END AS "LEASE_STATUS",
+		CASE   WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' 
+  				    WHEN "public"."leases"."status" = 'future' THEN 'FUTURE' 
+  					ELSE 'VACANT' END AS "LEASE_STATUS",
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END AS "DEPOSIT",
 		CASE
 			WHEN COUNT(DISTINCT "public"."lease_deposits"."refundable") > 1 THEN 'MANY'
@@ -113,9 +115,8 @@ LEASES AS (
 		ON "public"."leases"."primaryTenantId" = "public"."tenants"."id" 
   
 	WHERE 
-		
-		( "public"."leases"."end" > @AsOfDate OR "public"."leases"."end" IS NULL)
-		--AND ("public"."leases"."status" = 'current' or "public"."leases"."status" = 'future' )
+		("public"."leases"."end" >= @AsOfDate OR "public"."leases"."end" IS NULL)
+		--AND "public"."leases"."status" = 'current' or 
 		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
 		AND  CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
   	
@@ -137,10 +138,10 @@ LEASES_CHARGES AS (
   	MIN(LEASES."start") "start",
 	MAX(LEASES."lease_end") "lease_end", --because of difference in seconds, can't be grouped
   	LEASES."TENANT",
-  	COALESCE(MAX(CASE WHEN LEASES."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' END), MAX(LEASES."LEASE_STATUS")) AS "LEASE_STATUS",
+  	COALESCE(MAX(CASE WHEN LEASES."LEASE_STATUS" = 'OCCUPIED' THEN 'OCCUPIED' WHEN LEASES."LEASE_STATUS" = 'FUTURE' THEN 'FUTURE' END), MAX(LEASES."LEASE_STATUS")) AS "LEASE_STATUS",
   	COALESCE(MAX(CASE WHEN LEASES."DEPOSIT" = 'YES' THEN 'YES' END), MAX(LEASES."DEPOSIT")) AS "DEPOSIT",
   	COALESCE(MAX(CASE WHEN LEASES."REFUNDABLE" = 'YES' THEN 'YES' END), MAX(LEASES."REFUNDABLE")) AS "REFUNDABLE",
-	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."RENT_CHARGE" / 12 ELSE CHARGES."RENT_CHARGE" END) AS "RENT_AMOUNT",
+  	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."RENT_CHARGE" / 12 ELSE CHARGES."RENT_CHARGE" END) AS "RENT_AMOUNT",
   	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."OTHER_CHARGE" / 12 ELSE CHARGES."OTHER_CHARGE" END) AS "OTHER_AMOUNT",
 	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."RENT_CHARGE" ELSE CHARGES."RENT_CHARGE" * 12 END) AS "ANNUAL_RENT_AMOUNT",
   	SUM(CASE WHEN CHARGES."FREQUENCY" = 'Annually' THEN CHARGES."OTHER_CHARGE" ELSE CHARGES."OTHER_CHARGE" * 12 END) AS "ANNUAL_OTHER_AMOUNT"
@@ -151,7 +152,7 @@ LEASES_CHARGES AS (
   		AND LEASES."UNIT_ID" = CHARGES."UNIT_ID"
 	GROUP BY LEASES."LEASE_ID",
 		LEASES."UNIT_ID",
-		LEASES."TENANT" 
+		LEASES."TENANT"
 	),
 UNITS AS (
   SELECT 
@@ -181,7 +182,7 @@ UNITS AS (
     AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
     AND "public"."properties"."name" IN (@Property_Name)
     AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-  	AND "public"."units"."status" = 'active'
+	AND "public"."units"."status" = 'active'
   
   GROUP BY 
     "public"."properties"."id",
@@ -231,14 +232,11 @@ FINAL AS (
 	ORDER BY LEASES_CHARGES."LEASE_ID"
 	),
 FINAL_AUX AS (
-    -- prop SQ FT fix when having 2 or more leases for the same unit
-    -- we dont want to sum twice the unit sq ft
     SELECT COUNT(DISTINCT "LEASE_ID") "LEASES_COUNT",
     "UNIT_ID"
     FROM FINAL
     GROUP BY "UNIT_ID"
 	)
-
 
 SELECT 
 	UNITS."PROP_ID",
