@@ -122,8 +122,9 @@ LEASES AS (
 	WHERE 
 		/*(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
   			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)		) 	*/
-  		"public"."leases"."start" <= @AsOfDate
-		AND ("public"."leases"."status" = 'current')-- OR "public"."leases"."status" = 'future')
+  		--"public"."leases"."start" <= @AsOfDate
+		--AND 
+		("public"."leases"."status" = 'current')-- OR "public"."leases"."status" = 'future')
 		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
 		AND "public"."properties"."name" IN (@Property_Name)
   	

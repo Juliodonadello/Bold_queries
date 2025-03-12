@@ -24,6 +24,7 @@ WITH SQ_FT_TEMP AS (
 		AND "public"."properties"."name" IN (@Property_Name)
 		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
 		AND "public"."units"."status" = 'active'
+		AND "public"."unit_square_footage_items"."deleted_at" is null
 		
 	GROUP BY  1,3,4,5,6
   		

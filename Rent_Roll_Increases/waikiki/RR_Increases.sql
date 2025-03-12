@@ -122,8 +122,9 @@ LEASES AS (
 	WHERE 
 		/*(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
   			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)		) 	*/
-  		"public"."leases"."start" <= @AsOfDate
-		AND ("public"."leases"."status" = 'current' OR "public"."leases"."status" = 'future')
+  		--"public"."leases"."start" <= @AsOfDate
+		--AND 
+  		("public"."leases"."status" = 'current' OR "public"."leases"."status" = 'future')
 		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
 		AND "public"."properties"."name" IN (@Property_Name)
   	
@@ -466,15 +467,15 @@ where  "PROP_NAME" IN (@Property_Name)
 --group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28
 
 ORDER BY 
-"PROP_NAME", 
-CASE 
-        WHEN UNITS."UNIT_NAME" LIKE '%[^0-9]%' THEN 0  -- For alphanumeric or mixed strings
-        ELSE 1  -- For numeric values
-END,
-CASE
-        WHEN UNITS."UNIT_NAME" LIKE '%[^0-9]%' THEN UNITS."UNIT_NAME"  -- Order alphabetically for strings
-        ELSE LPAD(UNITS."UNIT_NAME", 10, '0')  -- Pad numeric values with leading zeros to ensure proper lexicographic sorting
-END,
-RENT_SCALATIONS_FINAL."EFFECTIVE_DATE_SCAL" ASC
+    "PROP_NAME", natural_sort(UNITS."UNIT_NAME"),
+    /*CASE 
+        WHEN UNITS."UNIT_NAME" NOT LIKE '%[^0-9]%' THEN 1  -- For numeric values
+        ELSE 0  -- For alphanumeric or mixed strings
+    END,
+    CASE
+        WHEN UNITS."UNIT_NAME" NOT LIKE '%[^0-9]%' THEN LPAD(UNITS."UNIT_NAME", 10, '0')  -- Pad numeric values
+        ELSE UNITS."UNIT_NAME"  -- Order alphabetically for strings
+    END, */
+    RENT_SCALATIONS_FINAL."EFFECTIVE_DATE_SCAL" ASC
 
 
