@@ -1,9 +1,9 @@
-WITH RECURSIVE date_series AS (
-    SELECT  (@From_Date::DATE - INTERVAL '1 month')::DATE as month --@From_Date::DATE as month
-    UNION ALL
-    SELECT (month + INTERVAL '1 month')::DATE
-    FROM date_series
-    WHERE month + INTERVAL '1 month' <= @To_Date::DATE
+WITH date_series AS (
+    SELECT generate_series(
+                   @From_Date::DATE - INTERVAL '1 month',
+                   @To_Date::DATE,
+                   INTERVAL '1 month'
+           )::DATE AS month
 ),
 CHARGES_TOT AS (
     SELECT 
