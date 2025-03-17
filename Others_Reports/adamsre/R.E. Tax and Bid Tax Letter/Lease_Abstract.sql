@@ -27,7 +27,7 @@ WITH CHARGES_TOT AS (
 					WHEN "public"."leases"."status" = 'future' THEN 'Future'
 					ELSE 'null' 
 			END  IN (@Lease_Status)
-  	--AND CAST("public"."leases"."name" AS TEXT) IN (cast(@Lease_Name as text))
+  	AND CAST("public"."leases"."name" AS TEXT) IN  (@Lease_Name)
   	AND
 	 (
 		"public"."lease_recurring_charge_amounts"."deleted_at" >= @AsOfDate 
