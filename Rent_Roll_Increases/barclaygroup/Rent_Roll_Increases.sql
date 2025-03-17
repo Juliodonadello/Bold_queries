@@ -107,7 +107,7 @@ LEASES AS (
 			WHEN MAX(CASE WHEN "public"."lease_deposits"."refundable" = 'true' THEN 1 ELSE 0 END) = 1 THEN 'YES'
 			ELSE 'NO'
 		END AS "REFUNDABLE",
-		"public"."tenants"."name"  as "TENANT"
+		CASE WHEN "public"."tenants"."business_as" IS NULL THEN "public"."tenants"."name" ELSE "public"."tenants"."business_as" END  as "TENANT"
   
   FROM "public"."leases"
 	INNER JOIN "public"."lease_units"
@@ -137,7 +137,8 @@ LEASES AS (
 		"public"."leases"."end",
 		CASE WHEN "public"."leases"."status" = 'current' THEN 'OCCUPIED' ELSE 'VACANT' END ,
 		CASE WHEN "public"."lease_deposits"."id" IS NULL THEN 'NO' ELSE 'YES' END ,
-		"public"."tenants"."name"
+		CASE WHEN "public"."tenants"."business_as" IS NULL THEN "public"."tenants"."name" ELSE "public"."tenants"."business_as" END
+
 	),
 LEASES_CHARGES AS (
 	SELECT 

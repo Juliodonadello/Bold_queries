@@ -229,10 +229,14 @@ SELECT
         WHEN EXTRACT(YEAR FROM "public"."leases"."move_in") < EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(YEAR FROM "public"."leases"."end") = EXTRACT(YEAR FROM @AsOfDate) 
             THEN EXTRACT(MONTH FROM "public"."leases"."end")
         WHEN EXTRACT(YEAR FROM "public"."leases"."move_in") < EXTRACT(YEAR FROM @AsOfDate) THEN 12
-        WHEN EXTRACT(YEAR FROM "public"."leases"."move_in") = EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(YEAR FROM "public"."leases"."end") > EXTRACT(YEAR FROM @AsOfDate)
-            THEN 12 - EXTRACT(MONTH FROM "public"."leases"."move_in") + 1
-        WHEN EXTRACT(YEAR FROM "public"."leases"."move_in") = EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(YEAR FROM "public"."leases"."end") = EXTRACT(YEAR FROM @AsOfDate)
+        WHEN EXTRACT(YEAR FROM "public"."leases"."move_in") = EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(YEAR FROM "public"."leases"."end") > EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(DAY FROM "public"."leases"."move_in") = 1
+			THEN 12 - EXTRACT(MONTH FROM "public"."leases"."move_in") + 1
+		WHEN EXTRACT(YEAR FROM "public"."leases"."move_in") = EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(YEAR FROM "public"."leases"."end") > EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(DAY FROM "public"."leases"."move_in") > 1
+            THEN 12 - EXTRACT(MONTH FROM "public"."leases"."move_in") + ((31 - EXTRACT(DAY FROM "public"."leases"."move_in")) / 31)
+        WHEN EXTRACT(YEAR FROM "public"."leases"."move_in") = EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(YEAR FROM "public"."leases"."end") = EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(DAY FROM "public"."leases"."move_in") = 1
             THEN EXTRACT(MONTH FROM "public"."leases"."end") - EXTRACT(MONTH FROM "public"."leases"."move_in") + 1
+		WHEN EXTRACT(YEAR FROM "public"."leases"."move_in") = EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(YEAR FROM "public"."leases"."end") = EXTRACT(YEAR FROM @AsOfDate) AND EXTRACT(DAY FROM "public"."leases"."move_in") > 1
+            THEN EXTRACT(MONTH FROM "public"."leases"."end") - EXTRACT(MONTH FROM "public"."leases"."move_in") + ((31 - EXTRACT(DAY FROM "public"."leases"."move_in")) / 31)
         ELSE 0
     END AS "Total Months Occupied",
 
