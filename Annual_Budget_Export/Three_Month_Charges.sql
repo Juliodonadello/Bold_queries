@@ -123,7 +123,9 @@ INNER JOIN "public"."leases" ON fp."LEASE_ID" = "public"."leases"."id"
 INNER JOIN "public"."tenants" ON "public"."tenants"."id" = "public"."leases"."primaryTenantId"
 INNER JOIN "public"."properties" ON fp."PROP_ID" = "public"."properties"."id"
 
-WHERE LOWER(CAST("public"."leases"."month_to_month" AS TEXT)) IN (LOWER(CAST(@month_to_month AS TEXT)))
+WHERE --LOWER(CAST("public"."leases"."month_to_month" AS TEXT)) IN (LOWER(CAST(@month_to_month AS TEXT)))
+	CAST("public"."leases"."month_to_month" AS TEXT) IN (@month_to_month)
 	AND CAST("public"."leases"."status" AS TEXT) IN (@Lease_Status)
 	
 GROUP BY 1,3,4,5,6,7,8,9,10,11,12
+	
