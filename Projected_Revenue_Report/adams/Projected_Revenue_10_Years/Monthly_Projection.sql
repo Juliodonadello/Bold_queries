@@ -5,7 +5,7 @@ WITH date_series AS (
                    INTERVAL '1 month'
            )::DATE AS month
 ),
-CHARGES_TOT AS (
+CHARGES_TOT AS MATERIALIZED (
     SELECT 
         "lease_recurring_charges"."lease_id" AS "LEASE_ID",
         "lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
