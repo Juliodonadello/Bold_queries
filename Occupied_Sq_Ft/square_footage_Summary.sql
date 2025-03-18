@@ -141,57 +141,53 @@ LEASES_CHARGES AS (
 		LEASES."LEASE_NAME" 
 
 	),
-SQ_FT_TEMP AS (
-	SELECT
-		"public"."properties"."id" AS "PROP_ID",
-		--SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT"
-  		SUM (CASE WHEN "public"."unit_square_footage_items"."value" IS NULL THEN "public"."units"."total_square_footage"
-							ELSE "public"."unit_square_footage_items"."value"
-			END) AS "TOT_SQ_FT"
-
-	FROM   "public"."units"
-	INNER JOIN "public"."properties"
-		ON "public"."units"."property_id" = "public"."properties"."id"
-	LEFT JOIN "public"."unit_square_footage_items"
-		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
-  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
-  		AND "public"."unit_square_footage_items"."square_footage_type" = 'Total'
-		
-	WHERE "public"."units"."deleted_at" IS NULL
-  		AND "public"."properties"."deleted_at" IS NULL
-		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-  		AND "public"."units"."status" = 'active'
-		AND "public"."unit_square_footage_items"."deleted_at" is null
-		
-	GROUP BY  "public"."properties"."id" 
-	),
 UNITS AS (
   SELECT 
-		"public"."properties"."id" AS "PROP_ID",
-		"public"."properties"."name" AS "PROP_NAME",
-		"public"."units"."id" AS "UNIT_ID",
-  		"public"."units"."name" AS "UNIT_NAME",
-		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
-  		"public"."unit_square_footage_items"."value" AS "EFF_UNIT_SQ_FT",
-		"public"."units"."unit_class" AS "UNIT_CLASS",
-  		MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT"
-  		
-	FROM   "public"."units"
-	INNER JOIN "public"."properties"
-		ON "public"."units"."property_id" = "public"."properties"."id"
-	LEFT JOIN "public"."unit_square_footage_items"
-		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
-  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
-  		AND "public"."unit_square_footage_items"."square_footage_type" = 'Total'
-  	
-  	WHERE "public"."properties"."deleted_at" IS NULL
-		AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-  		AND "public"."units"."status" = 'active'
-		AND "public"."unit_square_footage_items"."deleted_at" is null
-  		
-	GROUP BY 
-		1,2,3,4,5,6,7
+    "public"."properties"."id" AS "PROP_ID",
+    "public"."properties"."name" AS "PROP_NAME",
+    "public"."units"."id" AS "UNIT_ID",
+    "public"."units"."name" AS "UNIT_NAME",
+  	'Total' AS "SQ_FT_TYPE",
+  	"public"."units"."unit_class" AS "UNIT_CLASS",
+    MAX(COALESCE(uq."value", "public"."units"."total_square_footage")) AS "UNIT_SQ_FT"
+  
+  FROM "public"."units"
+  INNER JOIN "public"."properties"
+    ON "public"."units"."property_id" = "public"."properties"."id"
+  
+  LEFT JOIN (
+    SELECT DISTINCT ON ("unit_id") 
+      "unit_id",
+      "value",
+      "as_of_date"
+    FROM "public"."unit_square_footage_items"
+    WHERE "square_footage_type" = 'Total'
+      AND "as_of_date" <= @AsOfDate
+    ORDER BY "unit_id", "as_of_date" DESC
+  ) AS uq
+    ON uq."unit_id" = "public"."units"."id"
+  
+  WHERE "public"."properties"."deleted_at" IS NULL
+    AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
+    AND "public"."properties"."name" IN (@Property_Name)
+    AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+	AND "public"."units"."status" = 'active'
+  
+  GROUP BY 
+    "public"."properties"."id",
+    "public"."properties"."name",
+    "public"."units"."id",
+    "public"."units"."name",
+  	"public"."units"."unit_class"
+),
+SQ_FT_TEMP AS (
+	SELECT
+		UNITS."PROP_ID" as "PROP_ID",
+		SUM(UNITS."UNIT_SQ_FT") AS "TOT_SQ_FT"
+	 
+	FROM UNITS
+
+	GROUP BY  UNITS."PROP_ID"
 ),
 FINAL AS (
 	select 
@@ -238,13 +234,13 @@ SELECT
 	UNITS."UNIT_CLASS",
 	COUNT(DISTINCT UNITS."UNIT_ID") AS "UNIT_TOT",
 	SUM(CASE
-	  		WHEN (FINAL_AUX."LEASES_COUNT" = 0 OR FINAL_AUX."LEASES_COUNT" IS NULL) THEN COALESCE(UNITS."EFF_UNIT_SQ_FT",UNITS."UNIT_SQ_FT") 
-	  		ELSE COALESCE(UNITS."EFF_UNIT_SQ_FT",UNITS."UNIT_SQ_FT")/FINAL_AUX."LEASES_COUNT"
+	  		WHEN (FINAL_AUX."LEASES_COUNT" = 0 OR FINAL_AUX."LEASES_COUNT" IS NULL) THEN UNITS."UNIT_SQ_FT"
+	  		ELSE UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT"
 	  	END ) AS "PROP_SQ_FT",
 	--SUM(UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT") AS  "PROP_SQ_FT",
 	SUM(CASE 
-			WHEN (FINAL."LEASE_STATUS"='OCCUPIED') AND FINAL_AUX."LEASES_COUNT" > 1 THEN COALESCE(UNITS."EFF_UNIT_SQ_FT",UNITS."UNIT_SQ_FT")/FINAL_AUX."LEASES_COUNT" 
-			WHEN (FINAL."LEASE_STATUS"='OCCUPIED') THEN COALESCE(UNITS."EFF_UNIT_SQ_FT",UNITS."UNIT_SQ_FT")
+			WHEN (FINAL."LEASE_STATUS"='OCCUPIED') AND FINAL_AUX."LEASES_COUNT" > 1 THEN UNITS."UNIT_SQ_FT"/FINAL_AUX."LEASES_COUNT" 
+			WHEN (FINAL."LEASE_STATUS"='OCCUPIED') THEN UNITS."UNIT_SQ_FT"
 			ELSE 0 
 		END ) AS "OCCUPIED_UNIT_SQ_FT",
 	SUM(FINAL."RENT_CHARGE") "RENT_AMOUNT_TOT",
