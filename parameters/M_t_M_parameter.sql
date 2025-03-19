@@ -1,4 +1,4 @@
-SELECT "public"."leases"."month_to_month" "M_t_M"
+SELECT CASE WHEN CAST("public"."leases"."month_to_month" AS TEXT) ='true' THEN 'True' ELSE 'False' END "M_t_M"
 
 FROM "public"."leases"
 INNER  JOIN "public"."lease_units" ON "public"."leases"."id"="public"."lease_units"."lease_id"

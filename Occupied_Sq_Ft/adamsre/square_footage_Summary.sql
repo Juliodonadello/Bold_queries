@@ -100,10 +100,12 @@ LEASES AS (
 	WHERE 
 		(	("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" > @AsOfDate)
   			OR ("public"."leases"."start" <= @AsOfDate AND "public"."leases"."end" IS NULL)
+			OR (CAST("public"."leases"."month_to_month" AS TEXT) ='true')
 		)
 		AND "public"."leases"."status" = 'current'
 		AND ("public"."leases"."deleted_at" >= @AsOfDate OR "public"."leases"."deleted_at" IS NULL)
-  	
+		AND CASE WHEN CAST("public"."leases"."month_to_month" AS TEXT) ='true' THEN 'True' ELSE 'False' END IN (@month_to_month) 
+ 	
   GROUP BY
   		"public"."leases"."id",
 		"public"."lease_units"."unit_id",
