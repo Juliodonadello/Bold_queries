@@ -27,7 +27,9 @@ WITH CHARGES_TOT AS (
 					WHEN "public"."leases"."status" = 'future' THEN 'Future'
 					ELSE 'null' 
 			END  IN (@Lease_Status)
-  	AND CAST("public"."leases"."name" AS TEXT) IN  (@Lease_Name)
+  	--AND CAST("public"."leases"."name" AS TEXT) IN (cast(@Lease_Name as text))
+  	--AND CAST("public"."leases"."name" AS TEXT) IN  (CAST(@Lease_Name AS TEXT))
+  	AND CAST("public"."leases"."name" AS TEXT) IN  (@Lease_Name) --('02401000')
   	AND
 	 (
 		"public"."lease_recurring_charge_amounts"."deleted_at" >= @AsOfDate 
@@ -85,7 +87,12 @@ RECOVERY as (
 "public"."lease_recovery_control"."calculation_control_base_amount",
 "public"."recovery_control_expense_category"."expense_category",
 "public"."recovery_control_expense_category"."manual_percent",
-"public"."lease_recovery_control"."recovery_from" AS "formatted_date",
+--"public"."lease_recovery_control"."recovery_from" AS "formatted_date",
+CAST(CASE 	WHEN @AsOfDate <= CAST('2024/12/31' AS DATE) THEN '07/01/2024'
+  			WHEN @AsOfDate BETWEEN CAST('2025/01/01' AS DATE)  AND CAST('2025/01/07' AS DATE)  THEN '01/01/2025'
+  			WHEN @AsOfDate >= CAST('07/01/2025' AS DATE) THEN '07/01/2025'
+  			ELSE '01/01/2025'
+  END AS DATE) AS "formatted_date",
 "public"."lease_recovery_control"."recovery_to" AS "recovery_to"
 
 FROM "public"."lease_recovery_control" 
