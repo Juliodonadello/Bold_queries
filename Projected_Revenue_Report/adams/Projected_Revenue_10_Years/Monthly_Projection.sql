@@ -65,7 +65,12 @@ charged_amounts AS (
     FROM
         date_series ds
     CROSS JOIN CHARGES_TOT ct
-    WHERE (EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
+    WHERE 
+  		(
+  		(ct."FREQUENCY" <> 'One Time' AND EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
+		  OR
+		(ct."FREQUENCY" = 'One Time' AND EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
+		 )
   		AND (ct."LEASE_END" >= ds."month" or ct."LEASE_END" is null)
         AND (ct."RCHARGE_END" >= ds."month" or ct."RCHARGE_END" is NULL)
 ),

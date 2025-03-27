@@ -49,14 +49,14 @@ charged_amounts AS (
 					 		 AND 31 = EXTRACT(DAY FROM ct."LEASE_END") ) then ct."AMOUNT"
   				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."LEASE_END") 
 				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."LEASE_END")) then ct."AMOUNT" * EXTRACT(DAY FROM ct."LEASE_END") / 31
-                WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."RCHARGE_END") 
-				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."RCHARGE_END")) then ct."AMOUNT" * EXTRACT(DAY FROM ct."RCHARGE_END") / 31	
+  				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."RCHARGE_END") 
+				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."RCHARGE_END")) then ct."AMOUNT" * EXTRACT(DAY FROM ct."RCHARGE_END") / 31
   				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
 				   			 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")  
 					 		 AND 1 = EXTRACT(DAY FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT"
 				WHEN ( EXTRACT(MONTH FROM ds."month") = EXTRACT(MONTH FROM ct."EFFECTIVE_DATE") 
-								 AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT" * (31-EXTRACT(DAY FROM ct."EFFECTIVE_DATE")+1) / 31	 --FALTA RELLENAR CON LOS DIAS CON EL EFFECTIVE DATE ANTERIOR 
-                ELSE ct."AMOUNT" 
+							AND EXTRACT(YEAR FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE") ) then ct."AMOUNT" * (31-EXTRACT(DAY FROM ct."EFFECTIVE_DATE")+1) / 31	 --FALTA RELLENAR CON LOS DIAS CON EL EFFECTIVE DATE ANTERIOR  
+  				ELSE ct."AMOUNT"
   		END AS "AMOUNT",
   		--end proration in lease end
         ct."ITEM_ID",
@@ -67,8 +67,13 @@ charged_amounts AS (
     FROM
         date_series ds
     CROSS JOIN CHARGES_TOT ct
-    WHERE (EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
-  		AND (ct."LEASE_END" >= ds."month" or ct."LEASE_END" is null)
+    WHERE 
+  		(
+  		(ct."FREQUENCY" <> 'One Time' AND EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") >= EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
+		  OR
+		(ct."FREQUENCY" = 'One Time' AND EXTRACT(YEAR FROM ds."month")*100+EXTRACT(MONTH FROM ds."month") = EXTRACT(YEAR FROM ct."EFFECTIVE_DATE")*100+EXTRACT(MONTH FROM ct."EFFECTIVE_DATE"))
+		 )
+        AND (ct."LEASE_END" >= ds."month" or ct."LEASE_END" is null)
   		AND (ct."RCHARGE_END" >= ds."month" or ct."RCHARGE_END" is null)
 ),
 q_units_aux as (
@@ -220,5 +225,3 @@ GROUP BY
     1, 2, 3, 4, 5, 6
 ORDER BY
     1, 2, 4
-
-
