@@ -87,12 +87,12 @@ RECOVERY as (
 "public"."lease_recovery_control"."calculation_control_base_amount",
 "public"."recovery_control_expense_category"."expense_category",
 "public"."recovery_control_expense_category"."manual_percent",
---"public"."lease_recovery_control"."recovery_from" AS "formatted_date",
 CAST(CASE 	WHEN @AsOfDate <= CAST('2024/12/31' AS DATE) THEN '07/01/2024'
   			WHEN @AsOfDate BETWEEN CAST('2025/01/01' AS DATE)  AND CAST('2025/01/07' AS DATE)  THEN '01/01/2025'
   			WHEN @AsOfDate >= CAST('07/01/2025' AS DATE) THEN '07/01/2025'
   			ELSE '01/01/2025'
   END AS DATE) AS "formatted_date",
+"public"."lease_recovery_control"."recovery_from" AS "recovery_from",
 "public"."lease_recovery_control"."recovery_to" AS "recovery_to"
 
 FROM "public"."lease_recovery_control" 
@@ -100,6 +100,9 @@ LEFT JOIN "public"."recovery_control_expense_category"
 	ON "public"."lease_recovery_control"."id"="public"."recovery_control_expense_category"."lease_recovery_control_id"
 INNER JOIN "public"."lease_recurring_charges" 
 	ON "public"."lease_recurring_charges"."recovery_control_id"="public"."lease_recovery_control"."id"
+  
+WHERE "public"."lease_recovery_control"."recovery_from" = '07/01/2024' 	
+  AND "public"."lease_recovery_control"."recovery_to" = '12/31/2024'
 ),
 RECOVERY_FINAL AS (
   select
@@ -146,7 +149,7 @@ SELECT
 	MAX(RECOVERY_FINAL."TAXBID_manual_percent") "TAXBID_manual_percent"
 	
 FROM SECOND_AUX
-LEFT JOIN RECOVERY_FINAL
+INNER JOIN RECOVERY_FINAL
 	ON RECOVERY_FINAL."LEASE_ID" = SECOND_AUX."LEASE_ID"
 WHERE "ROW_NUM" <= 2
 GROUP BY 
