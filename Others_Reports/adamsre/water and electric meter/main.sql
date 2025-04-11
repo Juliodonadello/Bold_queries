@@ -1,91 +1,36 @@
-WITH CHARGES_TOT AS (
-  SELECT 
-  		"public"."properties"."name" AS "PROP_NAME",
-  		"public"."units"."name" AS "UNIT_NAME",
- 		"public"."lease_recurring_charges"."lease_id" AS "LEASE_ID",
-  		CAST("public"."leases"."name" AS TEXT) AS "LEASE_NAME",
-  		"public"."lease_recurring_charges"."order_entry_item_id" AS "ITEM_ID" ,
-  		"public"."lease_recurring_charge_amounts"."effective_date" AS "EFFECTIVE_DATE",
-  		"public"."lease_recurring_charge_amounts"."amount" AS "AMOUNT"
-  
-	FROM "public"."lease_recurring_charges"
-	INNER JOIN "public"."lease_recurring_charge_amounts"
-		ON "public"."lease_recurring_charges"."id" = "public"."lease_recurring_charge_amounts"."recurring_charge_id"
- 	INNER JOIN "public"."units"
-  		ON "public"."lease_recurring_charges"."unit_id" =  "public"."units"."id"
- 	INNER JOIN "public"."properties"
-  		ON "public"."properties"."id" =  "public"."units"."property_id"
-  	INNER JOIN "public"."leases"
-  		ON "public"."leases"."id"  = "public"."lease_recurring_charges"."lease_id" 
-  
-  	WHERE "public"."properties"."name" IN (@Property_Name)
-	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
-  	AND CASE 
-  					WHEN "public"."leases"."status" = 'current' THEN 'Current'
-					WHEN "public"."leases"."status" = 'canceled' THEN 'Canceled'
-					WHEN "public"."leases"."status" = 'terminated' THEN 'Terminated'
-					WHEN "public"."leases"."status" = 'future' THEN 'Future'
-					ELSE 'null' 
-			END  IN (@Lease_Status)
-  	AND CAST("public"."leases"."name" AS TEXT) IN  (@Lease_Name)
-  	AND ("public"."lease_recurring_charge_amounts"."deleted_at" >= @AsOfDate 
-		OR "public"."lease_recurring_charge_amounts"."deleted_at" IS NULL)
-	AND ("public"."lease_recurring_charge_amounts"."frequency" != 'One Time' --not a one time charge
-		OR
-		(
-        "public"."lease_recurring_charge_amounts"."frequency" = 'One Time'
-        AND	 CAST(EXTRACT(DAY FROM (@AsOfDate - "public"."lease_recurring_charge_amounts"."effective_date")) AS INTEGER) > 0
-        AND CAST(EXTRACT(DAY FROM (@AsOfDate - "public"."lease_recurring_charge_amounts"."effective_date")) AS INTEGER) < 31
-		)--one time charge with less than a month differnce
-		)
-	AND (	
-	  	"public"."lease_recurring_charges"."terminate_date" >= @AsOfDate
-		OR "public"."lease_recurring_charges"."terminate_date" IS NULL 
-		)
-	AND (
-		"public"."lease_recurring_charges"."deleted_at" >= @AsOfDate
-		OR "public"."lease_recurring_charges"."deleted_at" IS NULL
-		)
-	AND (
-		"public"."leases"."end" >= @AsOfDate
-		OR "public"."leases"."end" IS NULL
-		)
-  	AND ( 
-	  "public"."lease_recurring_charges"."order_entry_item_id" = 'R. E. TAX'
-		OR "public"."lease_recurring_charges"."order_entry_item_id" = 'TAX BID' )
-)
+with utilities as (
+	SELECT "public"."unit_utilities"."unit_id" "UNIT_ID",
+	MAX(CASE WHEN "public"."unit_utilities"."name" = 'Electric Rate:' THEN "public"."unit_utilities"."description" ELSE NULL END) AS "Electric Rate",
+	MAX(CASE WHEN "public"."unit_utilities"."name" = 'Electric Meter #:' THEN "public"."unit_utilities"."description" ELSE NULL END) AS "Electric Meter",
+  MAX(CASE WHEN "public"."unit_utilities"."name" = 'Frequency:' THEN "public"."unit_utilities"."description" ELSE NULL END) AS "Frequency",
+	MAX(CASE WHEN "public"."unit_utilities"."name" = 'Water Meter #:' THEN "public"."unit_utilities"."description" ELSE NULL END) AS "Water Meter"
 
-SELECT 
-    SECOND_AUX."PROP_NAME",
-  	SECOND_AUX."UNIT_NAME",
-    SECOND_AUX."LEASE_ID",
-	SECOND_AUX."LEASE_NAME",
-	
-   	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'R. E. TAX' AND SECOND_AUX."ROW_NUM" = 1 THEN SECOND_AUX."AMOUNT" END) AS "RETAX_amount_new",
-    MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'R. E. TAX' AND SECOND_AUX."ROW_NUM" = 2 THEN SECOND_AUX."AMOUNT" END) AS "RETAX_amount_old",
-	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'R. E. TAX' THEN RECOVERY_FINAL."RETAX_formatted_date" END) AS "RETAX_formatted_date",
-	
-    MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' AND SECOND_AUX."ROW_NUM" = 1 THEN SECOND_AUX."AMOUNT" END) AS "TAXBID_amount_new",
-    MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' AND SECOND_AUX."ROW_NUM" = 2 THEN SECOND_AUX."AMOUNT" END) AS "TAXBID_amount_old",
-	MAX(CASE WHEN SECOND_AUX."ITEM_ID" = 'TAX BID' THEN RECOVERY_FINAL."TAXBID_formatted_date" END) AS "TAXBID_formatted_date",
-	
-	MAX(RECOVERY_FINAL."RETAX_process_frequency") "RETAX_process_frequency",
-	MAX(RECOVERY_FINAL."RETAX_base_year") "RETAX_base_year",
-	MAX(RECOVERY_FINAL."RETAX_base_amount") "RETAX_base_amount",
-	MAX(RECOVERY_FINAL."RETAX_manual_percent") "RETAX_manual_percent",
-	
-    
-    MAX(RECOVERY_FINAL."TAXBID_process_frequency") "TAXBID_process_frequency",
-    MAX(RECOVERY_FINAL."TAXBID_base_year") "TAXBID_base_year",
-    MAX(RECOVERY_FINAL."TAXBID_base_amount") "TAXBID_base_amount",
-	MAX(RECOVERY_FINAL."TAXBID_manual_percent") "TAXBID_manual_percent"
-	
-FROM SECOND_AUX
-INNER JOIN RECOVERY_FINAL
-	ON RECOVERY_FINAL."LEASE_ID" = SECOND_AUX."LEASE_ID"
-WHERE "ROW_NUM" <= 2
-GROUP BY 
-    SECOND_AUX."PROP_NAME", 
-  	SECOND_AUX."UNIT_NAME",
-    SECOND_AUX."LEASE_ID",
-SECOND_AUX."LEASE_NAME"
+	FROM "public"."unit_utilities"
+
+	where ("public"."unit_utilities"."name" = 'Electric Rate:'
+		   or  "public"."unit_utilities"."name" = 'Electric Meter #:'
+		   or  "public"."unit_utilities"."name" = 'Water Meter #:' )
+	and ("public"."unit_utilities"."deleted_at" IS NULL or "public"."unit_utilities"."deleted_at"<= @AsOfDate)
+  
+  group by 1
+  )
+  
+  select "public"."leases"."name" "Lease_name",
+  "public"."tenants"."name" "tenant_name",
+  "public"."units"."name" "unit_name",
+  "public"."properties"."name" "property_name",
+  utilities."Electric Rate",
+  utilities."Electric Meter",
+  utilities."Frequency",
+  utilities."Water Meter"
+  
+FROM "public"."leases"
+INNER  JOIN "public"."lease_units" ON "public"."leases"."id"="public"."lease_units"."lease_id"
+INNER  JOIN "public"."units" ON "public"."units"."id"="public"."lease_units"."unit_id"
+INNER  JOIN "public"."tenants" ON "public"."tenants"."id"="public"."leases"."primaryTenantId"
+INNER  JOIN "public"."properties" ON "public"."units"."property_id"="public"."properties"."id"
+INNER JOIN utilities ON utilities."UNIT_ID" = "public"."units"."id"
+  
+  
+  
+  
