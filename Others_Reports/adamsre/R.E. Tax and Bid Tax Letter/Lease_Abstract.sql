@@ -101,8 +101,8 @@ LEFT JOIN "public"."recovery_control_expense_category"
 INNER JOIN "public"."lease_recurring_charges" 
 	ON "public"."lease_recurring_charges"."recovery_control_id"="public"."lease_recovery_control"."id"
   
-WHERE "public"."lease_recovery_control"."recovery_from" = '07/01/2024' 	
-  AND "public"."lease_recovery_control"."recovery_to" = '12/31/2024'
+WHERE "public"."lease_recovery_control"."recovery_from" = '01/01/2025' 	
+  AND "public"."lease_recovery_control"."recovery_to" = '06/30/2025'
 ),
 RECOVERY_FINAL AS (
   select

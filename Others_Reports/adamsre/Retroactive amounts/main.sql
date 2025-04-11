@@ -31,7 +31,7 @@ WHERE CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMP
 	AND "public"."lease_recovery_control"."deleted_at" IS NULL
 	AND "public"."lease_recurring_charge_amounts"."deleted_at" IS NULL
 	AND ("lease_recurring_charges"."order_entry_item_id" = 'R. E. TAX' OR "lease_recurring_charges"."order_entry_item_id" = 'TAX BID')
-	AND "public"."lease_recovery_control"."recovery_to" = '12-31-2024'
+	AND "public"."lease_recovery_control"."recovery_to" = '06-30-2025'
     AND "public"."lease_recurring_charge_amounts"."amount" > 0
 
 GROUP BY 1,2,3,4,5,6,7
@@ -42,7 +42,7 @@ CHARGES."TENANT_NAME",
 CHARGES."LEASE_NAME",
 CHARGES."ITEM_ID",
 --'01/04/2025' AS "EFFECTIVE_DATE",
-(CHARGES."AMOUNT" - COALESCE(CHARGES."previous_amount", 0)) * 3 AS "NEW_AMOUNT"
+(CHARGES."AMOUNT" - COALESCE(CHARGES."previous_amount", 0)) * 4 AS "NEW_AMOUNT"
 
 FROM CHARGES
 
