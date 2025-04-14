@@ -32,7 +32,8 @@ WHERE CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMP
 	AND "public"."lease_recurring_charge_amounts"."deleted_at" IS NULL
 	AND ("lease_recurring_charges"."order_entry_item_id" = 'R. E. TAX' OR "lease_recurring_charges"."order_entry_item_id" = 'TAX BID')
 	AND "public"."lease_recovery_control"."recovery_to" = '06-30-2025'
-    AND "public"."lease_recurring_charge_amounts"."amount" > 0
+    --AND "public"."lease_recurring_charge_amounts"."amount" > 0
+	AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
 
 GROUP BY 1,2,3,4,5,6,7
 )
