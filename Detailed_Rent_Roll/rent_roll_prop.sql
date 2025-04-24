@@ -1,4 +1,4 @@
-WITH CHARGES_FULL AS (
+WITH CHARGES_TOT AS (
   SELECT 
 		"public"."lease_recurring_charges"."id" AS "RCHARGE_ID",
   		"public"."lease_recurring_charges"."lease_id" AS "LEASE_ID",
@@ -14,11 +14,11 @@ WITH CHARGES_FULL AS (
 		ON "public"."lease_recurring_charges"."id" = "public"."lease_recurring_charge_amounts"."recurring_charge_id"
  	 INNER JOIN "public"."units"
   		ON "public"."lease_recurring_charges"."unit_id" =  "public"."units"."id"
-  	INNER JOIN "public"."properties"
-		ON "public"."properties"."id" = "public"."units"."property_id"
   
-  	WHERE  (
-		--"public"."lease_recurring_charge_amounts"."deleted_at" >= @AsOfDate OR 
+  	WHERE "public"."lease_recurring_charge_amounts"."effective_date" <= @AsOfDate
+	AND (
+		"public"."lease_recurring_charge_amounts"."deleted_at" >= @AsOfDate 
+		OR 
 		"public"."lease_recurring_charge_amounts"."deleted_at" IS NULL
 		)
 	AND (
@@ -45,31 +45,24 @@ WITH CHARGES_FULL AS (
 		OR
 		"public"."lease_recurring_charges"."deleted_at" is NULL 
 		)
-  	AND "public"."properties"."name" IN (@Property_Name)
+	AND "public"."properties"."name" IN (@Property_Name)
   	AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
   	AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
-  
-	group by 1,2,3,4,5,6,7,8
+
+	group by 1,2,3,4,5,6,7,8		
 	),
-CHARGES_TOT AS (
-  SELECT * 
-  FROM CHARGES_FULL
-  WHERE CHARGES_FULL."EFFECTIVE_DATE" <= @AsOfDate
-),
 MAX_CHARGES AS (
  	SELECT  "RCHARGE_ID" "RCHARGE_ID",
-  	"LEASE_ID" "LEASE_ID",
    	MAX("EFFECTIVE_DATE") "EFFECTIVE_DATE"
  	FROM CHARGES_TOT
-	GROUP BY "LEASE_ID","RCHARGE_ID"
+	GROUP BY "RCHARGE_ID"
  ),
 CHARGES AS ( 
  SELECT CHARGES_TOT.*
  FROM CHARGES_TOT
  INNER JOIN MAX_CHARGES
  	ON CHARGES_TOT."RCHARGE_ID" =  MAX_CHARGES."RCHARGE_ID" 
-	AND CHARGES_TOT."LEASE_ID" =  MAX_CHARGES."LEASE_ID"
-  	AND CHARGES_TOT."EFFECTIVE_DATE" =  MAX_CHARGES."EFFECTIVE_DATE"
+	AND CHARGES_TOT."EFFECTIVE_DATE" =  MAX_CHARGES."EFFECTIVE_DATE"
   GROUP BY 
   CHARGES_TOT."RCHARGE_ID",
   CHARGES_TOT."LEASE_ID",
@@ -85,7 +78,7 @@ LEASES AS (
   		"public"."leases"."name" AS "LEASE_NAME",
 		"public"."lease_units"."unit_id" AS "UNIT_ID",
 		"public"."leases"."created_at" AS "lease_created_at",
-  		"public"."leases"."move_in" AS "start",
+  		"public"."leases"."start" AS "start",
 		"public"."leases"."end" AS "lease_end",
 		"public"."tenants"."name"  as "TENANT"
   
@@ -182,6 +175,7 @@ FINAL AS (
   		UNITS."UNIT_NAME",
   		UNITS."UNIT_SQ_FT",
   		UNITS."available",
+  	    UNITS."move_in",
 		LEASES_CHARGES."start",
 		LEASES_CHARGES."lease_end",
    		COALESCE(LEASES_CHARGES."TENANT",'Vacant') "TENANT",
@@ -193,35 +187,19 @@ FINAL AS (
   
 	from UNITS
   	LEFT JOIN LEASES_CHARGES ON UNITS."UNIT_ID" = LEASES_CHARGES."UNIT_ID"
-	group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+	group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17
 	ORDER BY LEASES_CHARGES."LEASE_ID"
-	),
-INCREASES AS (
-  select CHARGES_FULL."RCHARGE_ID",
-  		CHARGES_FULL."LEASE_ID",
-  		CHARGES_FULL."AMOUNT" "NEXT_AMOUNT",
-  		CHARGES_FULL."ITEM_ID",
-  		CHARGES_FULL."EFFECTIVE_DATE" "NEXT_INCREASE",
-  		CHARGES_FULL."PROP_ID",
-  		CHARGES_FULL."UNIT_ID"
-  from CHARGES_FULL
-  INNER JOIN MAX_CHARGES
-	  ON CHARGES_FULL."RCHARGE_ID" =  MAX_CHARGES."RCHARGE_ID" 
-	  AND CHARGES_FULL."LEASE_ID" =  MAX_CHARGES."LEASE_ID"
-	AND CHARGES_FULL."EFFECTIVE_DATE" >  MAX_CHARGES."EFFECTIVE_DATE"
-)
-
-
-SELECT FINAL.*,
-	INCREASES."NEXT_INCREASE", 
-	INCREASES."NEXT_AMOUNT"
-FROM FINAL
-LEFT JOIN INCREASES 
-	ON FINAL."PROP_ID" = INCREASES."PROP_ID"
-	AND FINAL."UNIT_ID" = INCREASES."UNIT_ID"
-	AND FINAL."LEASE_ID" = INCREASES."LEASE_ID"
-	--AND FINAL."RCHARGE_ID" = INCREASES."RCHARGE_ID"
-	AND FINAL."ITEM_ID" = INCREASES."ITEM_ID"
+	)
 	
-
-ORDER BY natural_sort(FINAL."UNIT_NAME"), FINAL."ITEM_ID", INCREASES."NEXT_INCREASE"
+SELECT FINAL."PROP_ID",
+		FINAL."PROP_NAME",
+		COUNT(DISTINCT FINAL."UNIT_ID") "Q_UNITS",
+		SUM(CASE WHEN FINAL."TENANT" = 'Vacant' THEN 1 ELSE 0 END) "Q_Vac_UNITS",
+		SUM(CASE WHEN FINAL."TENANT" = 'Vacant' THEN 0 ELSE 1 END) "Q_Occ_UNITS",
+		SUM(CASE WHEN FINAL."TENANT" = 'Vacant' THEN 0 ELSE FINAL."UNIT_SQ_FT" END) "Occ_sqft",
+		SUM(CASE WHEN FINAL."TENANT" = 'Vacant' THEN  FINAL."UNIT_SQ_FT" ELSE 0 END) "Vac_sqft",
+		SUM(FINAL."UNIT_SQ_FT") "Prop_sqft",
+		SUM(FINAL."AMOUNT") "Tot_prop_charges"
+		
+FROM FINAL
+group by 1,2

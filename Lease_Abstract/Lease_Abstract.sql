@@ -26,7 +26,7 @@ WITH CHARGES_TOT AS (
 		END AS "LEASE_STATUS"
   
 	FROM "public"."lease_recurring_charges"
-	INNER JOIN "public"."lease_recurring_charge_amounts"
+	LEFT JOIN "public"."lease_recurring_charge_amounts"
 		ON "public"."lease_recurring_charges"."id" = "public"."lease_recurring_charge_amounts"."recurring_charge_id"
  	INNER JOIN "public"."units"
   		ON "public"."lease_recurring_charges"."unit_id" =  "public"."units"."id"
