@@ -12,8 +12,10 @@ WITH CHARGES_TOT AS (
 	FROM "public"."lease_recurring_charges"
 	LEFT JOIN "public"."lease_recurring_charge_amounts"
 		ON "public"."lease_recurring_charges"."id" = "public"."lease_recurring_charge_amounts"."recurring_charge_id"
- 	 INNER JOIN "public"."units"
+ 	INNER JOIN "public"."units"
   		ON "public"."lease_recurring_charges"."unit_id" =  "public"."units"."id"
+	INNER JOIN "public"."properties"
+		ON "public"."properties"."id" = "public"."units"."property_id"
   
   	WHERE "public"."lease_recurring_charge_amounts"."effective_date" <= @AsOfDate
 	AND (
@@ -47,7 +49,7 @@ WITH CHARGES_TOT AS (
 		)
 	AND "public"."properties"."name" IN (@Property_Name)
   	AND CAST("public"."properties"."company_relation_id" AS INT) = CAST(@REAL_COMPANY_ID AS INT)
-  	AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
+  	--AND "lease_recurring_charges"."order_entry_item_id" in (@Item_Id)
 
 	group by 1,2,3,4,5,6,7,8		
 	),
@@ -179,18 +181,18 @@ FINAL AS (
 		LEASES_CHARGES."start",
 		LEASES_CHARGES."lease_end",
    		COALESCE(LEASES_CHARGES."TENANT",'Vacant') "TENANT",
-		LEASES_CHARGES."ITEM_ID",
-		LEASES_CHARGES."AMOUNT",
-  		LEASES_CHARGES."FREQUENCY",
-  		LEASES_CHARGES."EFFECTIVE_DATE",
-  		CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE LEASES_CHARGES."AMOUNT"/UNITS."UNIT_SQ_FT" END AS "amount/Sq.Ft."
+		--LEASES_CHARGES."ITEM_ID",
+		SUM(LEASES_CHARGES."AMOUNT") "AMOUNT"
+  		--LEASES_CHARGES."FREQUENCY",
+  		--LEASES_CHARGES."EFFECTIVE_DATE"
+  		--CASE WHEN UNITS."UNIT_SQ_FT" = 0 THEN 0 ELSE LEASES_CHARGES."AMOUNT"/UNITS."UNIT_SQ_FT" END AS "amount/Sq.Ft."
   
 	from UNITS
   	LEFT JOIN LEASES_CHARGES ON UNITS."UNIT_ID" = LEASES_CHARGES."UNIT_ID"
-	group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17
+	group by 1,2,3,4,5,6,7,8,9,10,11,12
 	ORDER BY LEASES_CHARGES."LEASE_ID"
 	)
-	
+
 SELECT FINAL."PROP_ID",
 		FINAL."PROP_NAME",
 		COUNT(DISTINCT FINAL."UNIT_ID") "Q_UNITS",
