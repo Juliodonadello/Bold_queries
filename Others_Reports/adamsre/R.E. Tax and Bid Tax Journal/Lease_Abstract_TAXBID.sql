@@ -93,6 +93,9 @@ LEFT JOIN "public"."recovery_control_expense_category"
 	ON "public"."lease_recovery_control"."id"="public"."recovery_control_expense_category"."lease_recovery_control_id"
 INNER JOIN "public"."lease_recurring_charges" 
 	ON "public"."lease_recurring_charges"."recovery_control_id"="public"."lease_recovery_control"."id"
+
+WHERE CAST("public"."lease_recovery_control"."recovery_from" AS DATE) = CAST(@recoveryFrom AS DATE)
+AND CAST("public"."lease_recovery_control"."recovery_to" AS DATE) = CAST(@recoveryTo AS DATE)
 ),
 RECOVERY_FINAL AS (
   select
