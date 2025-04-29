@@ -88,8 +88,9 @@ RECOVERY as (
 "public"."recovery_control_expense_category"."expense_category",
 "public"."recovery_control_expense_category"."manual_percent",
 CAST(CASE 	WHEN @AsOfDate <= CAST('2024/12/31' AS DATE) THEN '07/01/2024'
-  			WHEN @AsOfDate BETWEEN CAST('2025/01/01' AS DATE)  AND CAST('2025/01/07' AS DATE)  THEN '01/01/2025'
-  			WHEN @AsOfDate >= CAST('07/01/2025' AS DATE) THEN '07/01/2025'
+  			WHEN @AsOfDate BETWEEN CAST('2025/01/01' AS DATE)  AND CAST('2025/30/06' AS DATE)  THEN '01/01/2025'
+			WHEN @AsOfDate BETWEEN CAST('2025/01/07' AS DATE)  AND CAST('2025/12/31' AS DATE)  THEN '07/01/2025'
+  			WHEN @AsOfDate >= CAST('2025/12/31' AS DATE) THEN '01/01/2026'
   			ELSE '01/01/2025'
   END AS DATE) AS "formatted_date",
 "public"."lease_recovery_control"."recovery_from" AS "recovery_from",
@@ -101,8 +102,10 @@ LEFT JOIN "public"."recovery_control_expense_category"
 INNER JOIN "public"."lease_recurring_charges" 
 	ON "public"."lease_recurring_charges"."recovery_control_id"="public"."lease_recovery_control"."id"
   
-WHERE "public"."lease_recovery_control"."recovery_from" = '01/01/2025' 	
-  AND "public"."lease_recovery_control"."recovery_to" = '06/30/2025'
+--WHERE "public"."lease_recovery_control"."recovery_from" = '01/01/2025' 	
+--  AND "public"."lease_recovery_control"."recovery_to" = '06/30/2025'
+WHERE CAST("public"."lease_recovery_control"."recovery_from" AS DATE) = CAST(@recoveryFrom AS DATE)
+	AND CAST("public"."lease_recovery_control"."recovery_to" AS DATE) = CAST(@recoveryTo AS DATE)
 ),
 RECOVERY_FINAL AS (
   select
