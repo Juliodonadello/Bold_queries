@@ -146,6 +146,7 @@ UNITS AS (
     FROM "public"."unit_square_footage_items"
     WHERE "square_footage_type" = 'Total'
       AND "as_of_date" <= @AsOfDate
+	  AND "deleted_at" IS NULL	
     ORDER BY "unit_id", "as_of_date" DESC
   ) AS uq
     ON uq."unit_id" = "public"."units"."id"
