@@ -1,69 +1,68 @@
-WITH SQ_FT_TEMP AS (
+WITH LAST_PROP_SQFT AS (
+    SELECT
+        p.id AS PROP_ID,
+  		p.company_relation_id as COMPANY_ID,
+        psfi.value AS PROP_SQ_FT,
+        psfi.square_footage_type AS PROP_SQ_FT_TYPE,
+        psfi.as_of_date AS AS_OF_DATE,
+        ROW_NUMBER() OVER (
+            PARTITION BY p.id, p.company_relation_id, psfi.square_footage_type
+            ORDER BY psfi.as_of_date asc
+        ) AS rn
+    FROM public.properties p
+    INNER JOIN public.property_square_footage_items psfi
+        ON psfi.property_id = p.id
+    WHERE p.name IN (@Property_Name)
+        AND CAST(p.company_relation_id AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+        AND psfi.square_footage_type IN (@Sqft_Type)
+        AND psfi.as_of_date <= @AsOfDate
+  		AND p."deleted_at" IS NULL
+  		AND psfi."deleted_at" IS NULL
+),
+LAST_UNIT_SQFT AS (
+    SELECT
+        p.id AS PROP_ID,
+  		u.id AS UNIT_ID,
+        psfi.value AS UNIT_SQ_FT,
+        psfi.square_footage_type AS UNIT_SQ_FT_TYPE,
+        psfi.as_of_date AS AS_OF_DATE,
+        ROW_NUMBER() OVER (
+            PARTITION BY p.id, u.id, psfi.square_footage_type
+            ORDER BY psfi.as_of_date asc
+        ) AS rn
+    FROM public.properties p
+  	INNER JOIN public.units u
+  		ON u.property_id = p.id
+    INNER JOIN public.unit_square_footage_items psfi
+        ON psfi.unit_id = u.id
+    WHERE p.name IN (@Property_Name)
+        AND CAST(p.company_relation_id AS INT) = CAST(@REAL_COMPANY_ID AS INT)
+        AND psfi.square_footage_type IN (@Sqft_Type)
+        AND psfi.as_of_date <= @AsOfDate
+  		AND p."deleted_at" IS NULL
+	  	AND (u."deleted_at" >= @AsOfDate OR u."deleted_at" IS NULL)
+	  	AND u."status" = 'active'
+		AND psfi."deleted_at" is null
+),
+SQ_FT_TEMP AS (
 	SELECT
-		"public"."properties"."id" AS "PROP_ID",
+		LAST_PROP_SQFT.PROP_ID AS "PROP_ID",
 		--SUM("public"."units"."total_square_footage") AS "TOT_SQ_FT",
-		SUM("public"."unit_square_footage_items"."value") AS "TOT_SQ_FT",
-  		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
-  		"public"."property_square_footage_items"."value" AS "PROP_SQ_FT",
-  		"public"."property_square_footage_items"."square_footage_type" AS "PROP_SQ_FT_TYPE",
-		"public"."properties"."company_relation_id" as "COMPANY_ID"
+		SUM(LAST_UNIT_SQFT.UNIT_SQ_FT) AS "TOT_SQ_FT",
+  		LAST_UNIT_SQFT.UNIT_SQ_FT_TYPE AS "SQ_FT_TYPE",
+  		LAST_PROP_SQFT.PROP_SQ_FT AS "PROP_SQ_FT",
+  		LAST_PROP_SQFT.PROP_SQ_FT_TYPE AS "PROP_SQ_FT_TYPE",
+  		LAST_PROP_SQFT.COMPANY_ID as "COMPANY_ID"
 	 
-	FROM   "public"."units"
-	INNER JOIN "public"."properties"
-		ON "public"."units"."property_id" = "public"."properties"."id"
-  	INNER JOIN "public"."property_square_footage_items"
-  		ON "public"."property_square_footage_items"."property_id" = "public"."properties"."id"
-  	LEFT JOIN "public"."unit_square_footage_items"
-		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
-  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
-  		AND "public"."unit_square_footage_items"."square_footage_type" IN (@Sqft_Type)
-  	
-
-  	WHERE "public"."properties"."deleted_at" IS NULL
-  		AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-		AND "public"."properties"."name" IN (@Property_Name)
-		AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
-		AND "public"."units"."status" = 'active'
-		AND "public"."unit_square_footage_items"."deleted_at" is null
+  	FROM LAST_PROP_SQFT
+  	INNER JOIN LAST_UNIT_SQFT ON LAST_PROP_SQFT.PROP_ID = LAST_UNIT_SQFT.PROP_ID
+  													AND LAST_PROP_SQFT.PROP_SQ_FT_TYPE = LAST_UNIT_SQFT.UNIT_SQ_FT_TYPE
+  
+  	WHERE LAST_PROP_SQFT.rn = 1
+  		AND LAST_UNIT_SQFT.rn = 1
 		
 	GROUP BY  1,3,4,5,6
 ),
-/*
-UNITS AS (
-  SELECT 
-		"public"."properties"."id" AS "PROP_ID",
-		"public"."properties"."name" AS "PROP_NAME",
-		"public"."units"."id" AS "UNIT_ID",
-  		"public"."units"."name" AS "UNIT_NAME",
-		--MAX("public"."units"."total_square_footage") AS "UNIT_SQ_FT",
-		MAX("public"."unit_square_footage_items"."value") AS "UNIT_SQ_FT",
-		"public"."unit_square_footage_items"."square_footage_type" AS "SQ_FT_TYPE",
-		"public"."units"."unit_class" AS "UNIT_CLASS",
-		"public"."properties"."company_relation_id" as "COMPANY_ID"
-  		
-	FROM   "public"."units"
-	INNER JOIN "public"."properties"
-		ON "public"."units"."property_id" = "public"."properties"."id"
-  	LEFT JOIN "public"."unit_square_footage_items"
-		ON "public"."unit_square_footage_items"."unit_id" = "public"."units"."id"
-  		AND "public"."unit_square_footage_items"."as_of_date" <= @AsOfDate
-  		AND "public"."unit_square_footage_items"."square_footage_type" IN (@Sqft_Type)
-	
-  	WHERE "public"."properties"."deleted_at" IS NULL
-  	AND ("public"."units"."deleted_at" >= @AsOfDate OR "public"."units"."deleted_at" IS NULL)
-	AND "public"."properties"."name" IN (@Property_Name)
-	AND CAST("public"."properties"."company_relation_id" AS INT)  = CAST(@REAL_COMPANY_ID AS INT)
-	AND "public"."units"."status" = 'active'
-
-	GROUP BY 
-		"public"."properties"."id",
-		"public"."properties"."name",
-		"public"."units"."id",
-  		"public"."units"."name",
-		"public"."unit_square_footage_items"."square_footage_type",
-		"public"."units"."unit_class",
-  		"public"."properties"."company_relation_id"
-)*/
 UNITS AS (
   SELECT 
     "public"."properties"."id" AS "PROP_ID",
@@ -100,7 +99,6 @@ UNITS AS (
   GROUP BY 1,2,3,4,5,6,7
 )
 
-
 SELECT 	UNITS."PROP_ID",
 		UNITS."PROP_NAME",
 		UNITS."UNIT_ID",
@@ -122,3 +120,5 @@ INNER JOIN SQ_FT_TEMP
 WHERE UNITS."SQ_FT_TYPE" IN (@Sqft_Type) --UNITS."UNIT_CLASS" IN (@Unit_Class)
 	
 GROUP BY 1,2,3,4,5,6,7,8,9,10
+
+
