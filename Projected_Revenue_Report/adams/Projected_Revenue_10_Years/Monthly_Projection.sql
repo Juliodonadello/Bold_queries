@@ -145,14 +145,6 @@ charged_amounts_2 AS (
   		SUM(charged_amounts."PRORATED_AMOUNT") "AMOUNT"
   		
 	FROM final_ca as charged_amounts
-  		INNER JOIN q_units_aux	
-  			ON q_units_aux."month" = charged_amounts."month"
-			  AND q_units_aux."LEASE_ID" = charged_amounts."LEASE_ID"
-			  AND q_units_aux."EFFECTIVE_DATE" = charged_amounts."EFFECTIVE_DATE"
-			  AND q_units_aux."ITEM_ID" = charged_amounts."ITEM_ID"
-			  AND q_units_aux."PROP_ID" = charged_amounts."PROP_ID"
-			  AND q_units_aux."LEASE_END" = charged_amounts."LEASE_END"
-  	WHERE "rn"  <= q_units_aux."Q_UNITS"
   	GROUP BY 1,2,3,4,5,6
   	ORDER BY 1
 ),
